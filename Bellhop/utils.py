@@ -77,7 +77,7 @@ if __name__ == '__main__':
     file_bathy = 'cognac_2000m.bty'
     Issp = 0
 
-    generate_bellhop_envfile_SSP(dir_env, file_SSP, file_bathy, Issp=0)
+    generate_bellhop_envfile_SSP(dir_env, file_SSP, file_bathy, Issp=Issp)
 
 
 
