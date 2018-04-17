@@ -1,8 +1,13 @@
 from pathlib import Path
 import numpy as np 
+import xarray as xr
 import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
 import scipy.io as sio
 
+from glob import glob
+
+from flow import *
 
 class bellhop(object):
     ''' bellhop class, contains simulations parameters, generates input files,
@@ -14,7 +19,7 @@ class bellhop(object):
         '''
         Parameters
         ----------
-        SSP : dic
+        SSP : dict
             Sound speed profile key and file 
             (example : {'p1': './SSP_4profils.mat'})
         '''
@@ -42,18 +47,100 @@ class bellhop(object):
         '''
         Parameters
         ----------
-        SSP_dict : dic
-            Sound speed profile key and file
+        SSP_dict : dict
+            Sound speed profile dictionnary whose keys represent profile names and items 
+            are either a .mat file or a dict containing parameters in order to create 
+            profiles from a numerical simulation
         '''
         
-        for ssp_key, file in SSP_dict.items():
-            if '.mat' in file:
-                D = sio.loadmat(file)
+        for ssp_key, item in SSP_dict.items():
+            if '.mat' in item:
+                D = sio.loadmat(item)
                 self.SSP[ssp_key] = {'c': D['SSP_Dr1m'], 'depth': D['Depthr'][0,:]}
+            elif isinstance(item, dict):
+                c, depth = self.compute_SSP_from_flow(**item)
+                self.SSP[ssp_key] = {'c': c, 'depth': depth}
                 
+                
+    def compute_SSP_from_flow(self, file=None, datadir=None, hgrid_file=None, \
+                              lon=None, lat=None, i_eta=None, i_xi=None, L=None, \
+                              itime=0, plot_map=False, **kwargs):
+        # load grid info
+        grd = grid(datadir=datadir, hgrid_file=hgrid_file)
         
+        # output file
+        ofiles = sorted(glob(grd._datadir+'*.*.nc'))
+        if file is None:
+            file = ofiles[0]
+            print('Uses the following output file: %s' %file)
+    
+        # load T/S
+        #T = Dataset(file)['temp']
+        #S = Dataset(file)['salt']
+        ds = xr.open_dataset(file, chunks = {'s_rho': 1}).isel(time=itime)
+        #ds['lon_rho'] = (('eta_rho', 'xi_rho'), grd.lon_rho)
+        #ds['lat_rho'] = (('eta_rho', 'xi_rho'), grd.lat_rho)
         
+        if lon is not None and lat is not None:
+            # xarray way, too slow at the moment
+            #d = (lon-ds['lon_rho'])**2 + (lat-ds['lat_rho'])**2
+            #T = ds['temp'].where(d == d.min(), drop=True)
+            #S = ds['salt'].where(d == d.min(), drop=True)
+            # numpy way, fast
+            d = (lon-grd.lon_rho)**2 + (lat-grd.lat_rho)**2
+            i_eta, i_xi = np.unravel_index(d.argmin(), d.shape)
+            T = ds['temp'].isel(eta_rho = i_eta, xi_rho = i_xi)
+            S = ds['salt'].isel(eta_rho = i_eta, xi_rho = i_xi)
         
+        if plot_map:
+            
+            crs = ccrs.PlateCarree()
+
+            fig=plt.figure(figsize=(15,10))
+            #
+            ax=plt.axes(projection=crs)
+            ax.set_extent(grd.hextent, crs)
+            gl=ax.gridlines(crs=crs,draw_labels=True)
+            gl.xlabels_top = False
+            ax.coastlines(resolution='50m')
+            #
+            toplt = ds['temp'].isel(s_rho=-1).values
+            # should probably mask T
+            cmap = plt.get_cmap('magma')
+            im = ax.pcolormesh(grd.lon_rho,grd.lat_rho,toplt,
+                               vmin=toplt.min(),vmax=toplt.max(), 
+                               cmap=cmap)
+            cbar = plt.colorbar(im, format='%.1f', extend='both')
+            plt.plot(lon, lat, '*',
+                     markeredgecolor='white', markerfacecolor='cadetblue', markersize=20)
+            ax.set_title('surface temperature [degC]')
+
+        
+        h = grd.h[None,i_eta,i_xi]
+        zeta = ds['zeta'].isel(eta_rho = i_eta, xi_rho = i_xi).values
+        z = grd.get_z(zeta, h, grd.sc_r[:,None], grd.Cs_r[:,None])
+    
+        # build a uniform grid
+        z_uni = z[:,[0]] # output z
+        #T_uni = interp2z0(z_uni, z, T.values)
+        #S_uni = interp2z0(z_uni, z, S.values)
+        T_uni = interp2z_1d(z_uni[:,[0]], z[:,0], T.values)
+        S_uni = interp2z_1d(z_uni[:,[0]], z[:,0], S.values)
+        #lat = grd.lat_rho[i_eta,i_xi]
+        c = get_soundc(T_uni, S_uni, z_uni, lon, lat)
+
+        # tmp
+        #self.grd = grd        
+        #self.ds = ds
+        #self.d = d
+        #self.dmin = dmin
+        #self.T = T
+        #self.S = S
+        #self.c = c
+        
+        return c, -z_uni
+    
+                
     def generate_envfile(self, ssp_key, Issp=0, file_env=None):
         ''' 
         Parameters
