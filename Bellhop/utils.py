@@ -20,13 +20,13 @@ class bellhop(object):
         '''
     
         zmax = 2550.
-        rmax = 35.
+        rmax = 100.
         simu = 'simulation'
-        self.params = {'name': simu, 'freq': 8000., \
+        self.params = {'name': simu, 'freq': 3000., \
                        'zs': 50., 'zmax': zmax, \
                        'rmax': rmax, 'NDepth': zmax + 1., \
                        'NRange': rmax * 100. + 1., \
-                       'ALimites': [-20., 20.], 'file_type': 'R'}
+                       'ALimites': [-15., 15.], 'file_type': 'R'}
         self.params.update(kwargs)
         self.params['file_bathy'] = self.params['name']+'.bty'
         self.params['file_env'] = self.params['name']+'.env'
@@ -106,8 +106,7 @@ class bellhop(object):
             f.write('%.1f  %.1f  %.1f \t  !Steps zbox(m) rbox(km)\n' %(
                 0.0,self.params['zmax']+450,self.params['rmax']+1.))
 
-
-            
+      
             
     def plotray (self, filename = None):
         ''' 
@@ -205,7 +204,7 @@ class bellhop(object):
         
         
        
-    def plotshd(self, filename=None):
+    def readshd(self, filename=None):
         ''' 
         Parameters
         ----------
@@ -285,10 +284,22 @@ class bellhop(object):
             fid.close()
             
         geometry = {"zs":zs, "f":freqVec,"thetas":thetas,"rarray":rarray,"zarray":zarray}
-          
+        
+        return geometry, pressure
             
-        ###### PLOT transmission loss #######    
-            
+        
+        
+        
+    def plotshd (self, geometry, pressure): 
+        ''' 
+        Parameters
+        ----------
+        geometry : dic
+            Output from readshd function. Contains depth and range arrays.
+        pressure : array
+            output from readshd function. Array of pressure given by bellhop simulation.
+        '''
+        
         # range and depth
         rt = geometry.get ("rarray")
         zt = geometry.get ("zarray")
@@ -311,35 +322,76 @@ class bellhop(object):
         tlmax = 10 * np.round (tlmax/10)          # make sure the limits are round numbers
         tlmin = tlmax - 50                        # min for colorbar
 
-        # plot TL 
-        plt.figure(figsize=(14,4))
-        plt.subplot(1,2,1)
-        plt.pcolormesh (rt, zt, TL, cmap='jet')
-        plt.title (filename[:-4])
-        plt.xlabel("range (m)")
-        plt.ylabel("depth (m)")
-        cbar = plt.colorbar()
-        cbar.set_label("TL(dB)")
-        plt.clim ([tlmin,tlmax])
-        plt.gca().invert_yaxis()
-        #plt.savefig('plotshd_'+filename[:-4], dpi=100)    
-
 
         # plot TL from 0 to 500m (ZOOM) 
-        plt.subplot(1,2,2)
         plt.pcolormesh (rt, zt, TL, cmap='jet')
-        plt.title (filename[:-4]+' ZOOM de 0 à 500m')
+        plt.title ('TL - ZOOM de 0 à 500m')
         plt.xlabel("range (m)")
         plt.ylabel("depth (m)")
         cbar = plt.colorbar()
         cbar.set_label("TL(dB)")
         plt.clim ([tlmin,tlmax])
-        plt.axis([0,35000,0,500])
+        plt.ylim(ymax = 500)
         plt.gca().invert_yaxis()
         #plt.savefig('plotshd_'+filename[:-4]+'_ZOOM', dpi=100)
         
         
+        
+        
+              
+    def plot_all(self, file_ray =None, file_shd=None):
+        ''' 
+        Parameters
+        ----------
+        file_ray : str
+            Output file from bellhop simulation (.ray)
+        file_shd : str
+            Output file from bellhop simulation (.shd)
+        '''
+        
+        plt.figure(figsize=(12,4))
+        plt.subplot(1,2,1)
+        self.plotray(filename = file_ray)
+        #
+        geometry, pressure = self.readshd(filename = file_shd)
+        plt.subplot(1,2,2)
+        self.plotshd (geometry, pressure)
   
+        
+    
+    def plotssp (self,ssp_key, Issp=0):
+        ''' 
+        Parameters
+        ----------
+        ssp_key: str
+            Key referencing which sound speed profile should be used
+        Issp : int
+            Sound speed profile index in SSP file
+        '''
+        c = self.SSP[ssp_key]['c'][Issp,:]
+        depth = self.SSP[ssp_key]['depth'][:]
+        plt.figure(figsize=(10,3))
+        
+        plt.subplot(1,2,1)
+        plt.plot(c, depth)
+        plt.gca().invert_yaxis()
+        plt.grid()
+        plt.title('celerity profile : '+self.params['name']+'_SSP%.d' %(Issp+1))
+        plt.xlabel('celerity (m/s)')
+        plt.ylabel('depth (m)')
+    
+        plt.subplot(1,2,2)
+        plt.plot(c, depth)
+        plt.ylim(-10, 150)
+        plt.gca().invert_yaxis()
+        plt.grid()
+        plt.title('Zoom')
+        plt.xlabel('celerity (m/s)')
+        plt.ylabel('depth (m)')
+        
+        
+
+    
     
     def plotssp2D (self, filename=None):
         '''
@@ -408,6 +460,17 @@ class bellhop(object):
 
         #plt.savefig('range-dependent SSP_'+file_SSP[:-4], dpi=100)
 
+        
 
 
-
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
