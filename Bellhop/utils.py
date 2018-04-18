@@ -32,7 +32,11 @@ class bellhop(object):
                        'rmax': rmax, 'NDepth': zmax + 1., \
                        'NRange': rmax * 100. + 1., \
                        'ALimites': [-15., 15.], 'file_type': 'R'}
+       
         self.params.update(kwargs)
+        self.params.update(NDepth = self.params['zmax'] + 1.)
+        self.params.update(NRange = self.params['rmax']*100 + 1.)
+        
         self.params['file_bathy'] = self.params['name']+'.bty'
         self.params['file_env'] = self.params['name']+'.env'
         self.params['file_ssp'] = self.params['name']+'.ssp'   # range dependent SSP
@@ -59,9 +63,11 @@ class bellhop(object):
                 self.SSP[ssp_key] = {'c': D['SSP_Dr1m'], 'depth': D['Depthr'][0,:]}
             elif isinstance(item, dict):
                 c, depth = self.compute_SSP_from_flow(**item)
-                self.SSP[ssp_key] = {'c': c, 'depth': depth}
+                self.SSP[ssp_key] = {'c': c[::-1].T, 'depth': depth[::-1][:,0]} 
                 
-                
+              
+            
+            
     def compute_SSP_from_flow(self, file=None, datadir=None, hgrid_file=None, \
                               lon=None, lat=None, i_eta=None, i_xi=None, L=None, \
                               itime=0, plot_map=False, **kwargs):
@@ -140,8 +146,10 @@ class bellhop(object):
         
         return c, -z_uni
     
-                
-    def generate_envfile(self, ssp_key, Issp=0, file_env=None):
+          
+        
+        
+    def generate_envfile(self, ssp_key, Issp=0, file_env=None, SSP_depth_step=1):
         ''' 
         Parameters
         ----------
@@ -172,7 +180,7 @@ class bellhop(object):
             #
             depth_max = depth.max() # ! Bathymetrie maximale
             f.write('%d %.1f %.1f\n'%(0, 0.0, depth_max))
-            for i in range(0,len(depth),5):
+            for i in range(0,len(depth),SSP_depth_step):
                 f.write('%.1f %.1f /\n' %(depth[i], c[i]))
             #
             f.write('\'A*\' %.1f\n' %0.0)
@@ -457,6 +465,7 @@ class bellhop(object):
         '''
         c = self.SSP[ssp_key]['c'][Issp,:]
         depth = self.SSP[ssp_key]['depth'][:]
+
         plt.figure(figsize=(10,3))
         
         plt.subplot(1,2,1)
