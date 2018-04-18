@@ -19,6 +19,8 @@ __pycache__/
 # data files
 *.mat
 *.env
+*.ray
+*.shd
 *.nc
 
 # fig and movies
