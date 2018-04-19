@@ -454,7 +454,7 @@ class bellhop(object):
   
         
     
-    def plotssp (self,ssp_key, Issp=0):
+    def plotssp (self,ssp_key, Issp=0, y_zoom =150):
         ''' 
         Parameters
         ----------
@@ -478,7 +478,7 @@ class bellhop(object):
     
         plt.subplot(1,2,2)
         plt.plot(c, depth)
-        plt.ylim(-10, 150)
+        plt.ylim(-10, y_zoom)
         plt.gca().invert_yaxis()
         plt.grid()
         plt.title('Zoom')
