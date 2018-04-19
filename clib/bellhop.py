@@ -7,7 +7,7 @@ import scipy.io as sio
 
 from glob import glob
 
-from flow import *
+from .flow import *
 
 class bellhop(object):
     ''' bellhop class, contains simulations parameters, generates input files,
