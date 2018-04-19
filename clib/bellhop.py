@@ -70,7 +70,7 @@ class bellhop(object):
             
     def compute_SSP_from_flow(self, file=None, datadir=None, hgrid_file=None, \
                               lon=None, lat=None, i_eta=None, i_xi=None, L=None, \
-                              itime=0, plot_map=False, **kwargs):
+                              itime=0, plot_map=False, contour=False, **kwargs):
         # load grid info
         grd = grid(datadir=datadir, hgrid_file=hgrid_file)
         
@@ -120,7 +120,12 @@ class bellhop(object):
             plt.plot(lon, lat, '*',
                      markeredgecolor='white', markerfacecolor='cadetblue', markersize=20)
             ax.set_title('surface temperature [degC]')
-
+           
+        if contour :
+            
+            cp = plt.contour(grd.lon_rho, grd.lat_rho, grd.h,[500,1000,2500],colors='white')
+            plt.clabel(cp, inline=1, fmt='%d', fontsize=10)
+        
         
         h = grd.h[None,i_eta,i_xi]
         zeta = ds['zeta'].isel(eta_rho = i_eta, xi_rho = i_xi).values
