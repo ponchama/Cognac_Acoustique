@@ -11,16 +11,16 @@ warnings.filterwarnings(action='ignore')
 # class for sources
 class source(object):
     ''' A source object '''
-    def __init__(self, x, y, e_dx=10., e_c=10., c_b=1500., label=''):
+    def __init__(self, x_s, y_s, e_dx=10., e_c=10., c_b=1500., label=''):
         '''
         Parameters
         ----------
-        x,y  - horizontal position in meters
+        x_s, y_s  - horizontal position in meters
         e_i - rms between transductor position uncertainty on the distance estimation
         label - a label for the source
         '''
-        self.x=x
-        self.y=y
+        self.x_s = x_s
+        self.y_s = y_s
         #
         self.e_dx = e_dx
         self.draw_dxdy(e_dx)
@@ -31,9 +31,18 @@ class source(object):
         #
         #self.tau_i=None
         self.label = ('source ' + label).strip()
-        
+    
+    def __getitem__(self, item):
+        if item is 'x':
+            return self.x_s
+        elif item is 'y':
+            return self.y_s
+        else:
+            return getattr(self, item)
+    
     def plot(self):
-        plt.plot(self.x/1.e3,self.y/1.e3, color='salmon', marker='o', markersize=20, label=self.label)
+        plt.plot(self.x_s/1.e3, self.y_s/1.e3, color='salmon', marker='o', 
+                 markersize=20, label=self.label)
         
     def draw_dxdy(self, e_dx, Np=1):
         ''' compute Np realizations of transductor position
@@ -41,8 +50,8 @@ class source(object):
         self.e_dx = e_dx
         self.dx = np.random.randn(Np)*e_dx
         self.dy = np.random.randn(Np)*e_dx
-        self.xt = self.x + self.dx
-        self.yt = self.y + self.dy
+        self.x_t = self.x_s + self.dx
+        self.y_t = self.y_s + self.dy
 
     def draw_celerity(self, e_c, Np=1, c_b=None):
         ''' compute Np celerities with rms celerities e_c
@@ -73,6 +82,9 @@ class receiver(object):
         self.draw_clock_drift(e_dt)
         self.label = ('receiver ' + label).strip()
 
+    def __getitem__(self, item):
+        return getattr(self, item)
+        
     def plot(self):
         plt.plot(self.x/1.e3,self.y/1.e3, color='green', marker='*', markersize=20, label=self.label)
         
@@ -82,17 +94,17 @@ class receiver(object):
 
 
 def dist(a,b):
-    return np.sqrt((a.x-b.x)**2+(a.y-b.y)**2)
+    return np.sqrt((a['x']-b['x'])**2+(a['y']-b['y'])**2)
 
         
 def geolocalize(r, sources, x0=None, disp=True):
 
     # source float position (known)
-    x_s = np.array([s.x for s in sources])
-    y_s = np.array([s.y for s in sources])
+    x_s = np.array([s.x_s for s in sources])
+    y_s = np.array([s.y_s for s in sources])
     # transductor positions (unknown)
-    x_t = np.array([s.xt[0] for s in sources])
-    y_t = np.array([s.yt[0] for s in sources])
+    x_t = np.array([s.x_t[0] for s in sources])
+    y_t = np.array([s.y_t[0] for s in sources])
     # emission time
     t_e = np.zeros_like(x_s)
     # measured arrival times
@@ -101,7 +113,7 @@ def geolocalize(r, sources, x0=None, disp=True):
 
     Ns = len(sources)
     idx = slice(3, 3+2*Ns, 2)
-    idy = slice(3, 3+2*Ns, 2)
+    idy = slice(4, 3+2*Ns, 2)
     idc = slice(3+2*Ns,3+3*Ns)
 
     # weights
@@ -157,7 +169,7 @@ def geolocalize(r, sources, x0=None, disp=True):
             dx = x[idx]
             dy = x[idy]
             dc = x[idc]
-            return np.array([(x[0] - s.x - dx[i])**2 + (x[1] - s.y - dy[i])**2 
+            return np.array([(x[0] - s.x_s - dx[i])**2 + (x[1] - s.y_s - dy[i])**2 
                               - (s.c_b + dc[i])**2 *(t_r_tilda[i] + dt - t_e[i])**2])
         # ! late binding gotcha !
         def cjac(x, i=i, s=s):
@@ -167,11 +179,11 @@ def geolocalize(r, sources, x0=None, disp=True):
             dc = x[idc]
             #
             jac = np.zeros_like(x)
-            jac[0] = 2.*(x[0] - s.x - dx[i])
-            jac[1] = 2.*(x[1] - s.y - dy[i])
+            jac[0] = 2.*(x[0] - s.x_s - dx[i])
+            jac[1] = 2.*(x[1] - s.y_s - dy[i])
             jac[2] = -2.*(s.c_b + dc[i])**2 * (t_r_tilda[i] + dt - t_e[i])
-            jac[idx][i] = -2.*(x[0] - s.x - dx[i])
-            jac[idy][i] = -2.*(x[1] - s.y - dy[i])
+            jac[idx][i] = -2.*(x[0] - s.x_s - dx[i])
+            jac[idy][i] = -2.*(x[1] - s.y_s - dy[i])
             jac[idc][i] = - 2.*(s.c_b + dc[i]) * (t_r_tilda[i] + dt - t_e[i])**2
             return jac
         #
