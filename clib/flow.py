@@ -182,11 +182,20 @@ def interp2z_1d(z0, z, v):
     from scipy.interpolate import interp1d
     return interp1d(z,v, kind='cubic')(z0)
 
-#def interp2z0(z0, z, v):
-#    ''' Interpolate on a horizontally uniform grid
-#    '''
-#    import fast_interp3D as fi  # OpenMP accelerated C based interpolator
-#    return fi.interp(z0.astype('float64'),z.astype('float64'),v)
+def interp2z(z0, z, v):
+    ''' Interpolate on a horizontally uniform grid
+    '''
+    import fast_interp3D as fi  # OpenMP accelerated C based interpolator
+    #print(v.ndim)
+    #print(z.ndim)
+    if v.ndim == 1 or z.ndim == 1:
+        v = v.squeeze()
+        z = z.squeeze()
+        return fi.interp(z0.astype('float64'),z[:,None,None].astype('float64'),
+                         v[:,None,None]) #.squeeze()
+    else:
+        # assumes input files are indeed 3D
+        return fi.interp(z0.astype('float64'), z.astype('float64'), v)
 
 
 #--------------------------------------------------------------------------------------------
@@ -194,16 +203,23 @@ def get_soundc(t,s,z,lon,lat):
     ''' compute sound velocity
     '''
     import gsw
-    if isinstance(lat,float):
-        latm = lat
-    else:
-        latm = lat.mean()
+    latm = np.mean(lat)
+    lonm = np.mean(lon)
+    #
     p = gsw.p_from_z(z,latm)
-    SA = gsw.SA_from_SP(s, p, lon, lat)
+    SA = gsw.SA_from_SP(s, p, lonm, latm)
     CT = gsw.CT_from_pt(SA,t)
     c = gsw.sound_speed(s,t,p)
     # inputs are: SA (absolute salinity) and CT (conservative temperature)
     return c
     
+    
+def earth_dist(lon, lat):
+    deg2m=111.e3
+    dlon = np.diff(lon)*np.cos(np.mean(lat))
+    dlat = np.diff(lat)
+    return deg2m * np.sqrt( dlon**2 + dlat**2 )
+
+
     
     
