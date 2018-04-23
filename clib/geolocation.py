@@ -199,5 +199,17 @@ def geolocalize(r, sources, x0=None, disp=True):
     dx = res.x[idx]
     dy = res.x[idy]
     dc = res.x[idc]
-    return x, y, dt, dx, dy, dc
+    
+    success = res.success
+    message = res.message
+    
+    
+    # hard constraints verified ? 
+    
+    for i, s in enumerate(sources):
+        aa = (x - s.x_s - dx[i])**2 + (y - s.y_s - dy[i])**2 - (s.c_b + dc[i])**2 *(t_r_tilda[i] + dt - t_e[i])**2
+        print( 'source %d : %.1f' %(i+1,aa))
+        
+    
+    return x, y, dt, dx, dy, dc, success, message
         
