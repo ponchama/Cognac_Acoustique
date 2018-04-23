@@ -249,7 +249,7 @@ def get_soundc(t, s, z, lon, lat):
     
 def earth_dist(lon, lat):
     deg2m=111.e3
-    dlon = np.diff(lon)*np.cos(np.mean(lat))
+    dlon = np.diff(lon)*np.cos(np.pi/180.*np.mean(lat))
     dlat = np.diff(lat)
     return deg2m * np.sqrt( dlon**2 + dlat**2 )
 
