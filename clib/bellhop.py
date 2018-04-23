@@ -4,6 +4,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import scipy.io as sio
+from scipy import interpolate
 
 from glob import glob
 
@@ -62,15 +63,16 @@ class bellhop(object):
                 D = sio.loadmat(item)
                 self.SSP[ssp_key] = {'c': D['SSP_Dr1m'], 'depth': D['Depthr'][0,:]}
             elif isinstance(item, dict):
-                c, depth = self.compute_SSP_from_flow(**item)
-                self.SSP[ssp_key] = {'c': c[::-1].T, 'depth': depth[::-1][:,0]} 
+                c, depth, s, lon, lat = self.compute_SSP_from_flow(**item)
+                self.SSP[ssp_key] = {'c': c[::-1,...].T, 'depth': depth[::-1,...], 
+                                     's': s, 'lon': lon, 'lat': lat}
                 
               
             
             
     def compute_SSP_from_flow(self, file=None, datadir=None, hgrid_file=None, \
                               lon=None, lat=None, i_eta=None, i_xi=None, L=None, \
-                              itime=0, plot_map=False, contour=False, **kwargs):
+                              itime=0, plot_map=False, contour=True, **kwargs):
         # load grid info
         grd = grid(datadir=datadir, hgrid_file=hgrid_file)
         
@@ -87,17 +89,88 @@ class bellhop(object):
         #ds['lon_rho'] = (('eta_rho', 'xi_rho'), grd.lon_rho)
         #ds['lat_rho'] = (('eta_rho', 'xi_rho'), grd.lat_rho)
         
-        if lon is not None and lat is not None:
+        section=False
+        if lon is None or lat is None:
+            T = ds['temp'].isel(eta_rho = i_eta, xi_rho = i_xi)
+            S = ds['salt'].isel(eta_rho = i_eta, xi_rho = i_xi)            
+        else:
             # xarray way, too slow at the moment
             #d = (lon-ds['lon_rho'])**2 + (lat-ds['lat_rho'])**2
             #T = ds['temp'].where(d == d.min(), drop=True)
             #S = ds['salt'].where(d == d.min(), drop=True)
             # numpy way, fast
-            d = (lon-grd.lon_rho)**2 + (lat-grd.lat_rho)**2
-            i_eta, i_xi = np.unravel_index(d.argmin(), d.shape)
-            T = ds['temp'].isel(eta_rho = i_eta, xi_rho = i_xi)
-            S = ds['salt'].isel(eta_rho = i_eta, xi_rho = i_xi)
+            if isinstance(lon, float) and isinstance(lat, float):
+                d = (lon-grd['lon_rho'])**2 + (lat-grd['lat_rho'])**2
+                i_eta, i_xi = np.unravel_index(d.argmin(), d.shape)
+                #
+                T = ds['temp'].isel(eta_rho = i_eta, xi_rho = i_xi)
+                S = ds['salt'].isel(eta_rho = i_eta, xi_rho = i_xi)
+            else:
+                section=True
+                d = (lon[0]-grd['lon_rho'])**2 + (lat[0]-grd['lat_rho'])**2
+                i0_eta, i0_xi = np.unravel_index(d.argmin(), d.shape)
+                #
+                d = (lon[1]-grd['lon_rho'])**2 + (lat[1]-grd['lat_rho'])**2
+                i1_eta, i1_xi = np.unravel_index(d.argmin(), d.shape)
+                #
+                i_eta = slice(i0_eta, i1_eta, np.sign(i1_eta-i0_eta))
+                i_xi = slice(i0_xi, i1_xi, np.sign(i1_xi-i0_xi))
+                #
+                #T = ds['temp'].isel(eta_rho = i_eta, xi_rho = i_xi)
+                #S = ds['salt'].isel(eta_rho = i_eta, xi_rho = i_xi)
+                
+        # compute depth level positions
+        h = grd['h'].isel(eta_rho = i_eta, xi_rho = i_xi)
+        zeta = ds['zeta'].isel(eta_rho = i_eta, xi_rho = i_xi)
+        z = grd.get_z(zeta, h)
+        # build a uniform grid, output depth levels, should be an option
+        if z.ndim == 3:
+            z_uni = z.isel(eta_rho = 0, xi_rho = 0).values
+        elif z.ndim == 1:
+            z_uni = z.values
+                
+        if not section:
+            T_uni = interp2z(z_uni, z.values, T.values).squeeze()
+            S_uni = interp2z(z_uni, z.values, S.values).squeeze()
+            #T_uni = interp2z_1d(z_uni[:,[0]], z[:,0], T.values)
+            #S_uni = interp2z_1d(z_uni[:,[0]], z[:,0], S.values)
+            #lat = grd.lat_rho[i_eta,i_xi]
+            c = get_soundc(T_uni, S_uni, z_uni, lon, lat).squeeze()
+            #
+            slon, slat, s = lon, lat, None
+        else:
+            # number of horizontal points in the section
+            Np = int(np.sqrt( float(i1_eta-i0_eta)**2 + float(i1_xi-i0_xi)**2 ))
+            S = np.arange(Np).astype(float)/Np
+            c = np.zeros((z_uni.shape[0],Np))
+            print('The transect will contain %d horizontal points' %Np)
+            #
+            xx, yy = np.meshgrid(np.arange(2.),np.arange(2.))
+            for i, s in enumerate(S):
+                s_eta = i0_eta + s *(i1_eta-i0_eta)
+                i_eta = int(s_eta)
+                di_eta = int(s *(i1_eta-i0_eta))
+                #
+                s_xi = i0_xi + s *(i1_xi-i0_xi)
+                i_xi = int(s_xi)
+                di_xi = int(s *(i1_xi-i0_xi))
+                #
+                lz = z.isel(eta_rho = slice(di_eta, di_eta+2), xi_rho = slice(di_xi, di_xi+2))
+                lT = ds['temp'].isel(eta_rho = slice(i_eta,i_eta+2), xi_rho = slice(i_xi,i_xi+2))
+                lS = ds['salt'].isel(eta_rho = slice(i_eta,i_eta+2), xi_rho = slice(i_xi,i_xi+2))
+                #
+                T_uni = interp2z(z_uni, lz.values, lT.values).squeeze()
+                S_uni = interp2z(z_uni, lz.values, lS.values).squeeze()
+                lc = get_soundc(T_uni, S_uni, z_uni[:,None,None], lon, lat).squeeze()
+                for k in range(z_uni.size):
+                    c[k,i] = interpolate.interp2d(xx, yy, lc[k,...], kind='linear')(s_xi-i_xi, s_eta-i_eta)
+                #print(i)
+            #
+            slon = lon[0] + s*lon[1]
+            slat = lat[0] + s*lat[1]
+            s = S * earth_dist(lon,lat)
         
+        #
         if plot_map:
             
             crs = ccrs.PlateCarree()
@@ -113,43 +186,22 @@ class bellhop(object):
             toplt = ds['temp'].isel(s_rho=-1).values
             # should probably mask T
             cmap = plt.get_cmap('magma')
-            im = ax.pcolormesh(grd.lon_rho,grd.lat_rho,toplt,
+            im = ax.pcolormesh(grd['lon_rho'],grd['lat_rho'],toplt,
                                vmin=toplt.min(),vmax=toplt.max(), 
                                cmap=cmap)
             cbar = plt.colorbar(im, format='%.1f', extend='both')
-            plt.plot(lon, lat, '*',
-                     markeredgecolor='white', markerfacecolor='cadetblue', markersize=20)
+            plt.plot(lon, lat, '*', markeredgecolor='white', markerfacecolor='cadetblue', markersize=20)
+            if section:
+                plt.plot(lon, lat, '-', color='cadetblue', linewidth=2)
             ax.set_title('surface temperature [degC]')
            
         if contour :
             
-            cp = plt.contour(grd.lon_rho, grd.lat_rho, grd.h,[500,1000,2500],colors='white')
+            cp = plt.contour(grd['lon_rho'], grd['lat_rho'], grd['h'],[500,1000,2500],colors='white')
             plt.clabel(cp, inline=1, fmt='%d', fontsize=10)
-        
-        
-        h = grd.h[None,i_eta,i_xi]
-        zeta = ds['zeta'].isel(eta_rho = i_eta, xi_rho = i_xi).values
-        z = grd.get_z(zeta, h, grd.sc_r[:,None], grd.Cs_r[:,None])
-    
-        # build a uniform grid
-        z_uni = z[:,[0]] # output z
-        #T_uni = interp2z0(z_uni, z, T.values)
-        #S_uni = interp2z0(z_uni, z, S.values)
-        T_uni = interp2z_1d(z_uni[:,[0]], z[:,0], T.values)
-        S_uni = interp2z_1d(z_uni[:,[0]], z[:,0], S.values)
-        #lat = grd.lat_rho[i_eta,i_xi]
-        c = get_soundc(T_uni, S_uni, z_uni, lon, lat)
-
-        # tmp
-        #self.grd = grd        
-        #self.ds = ds
-        #self.d = d
-        #self.dmin = dmin
-        #self.T = T
-        #self.S = S
-        #self.c = c
-        
-        return c, -z_uni
+                
+        return c, -z_uni, s, slon, slat
+            
     
           
         
