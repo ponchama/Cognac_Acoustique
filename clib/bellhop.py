@@ -63,9 +63,9 @@ class bellhop(object):
                 D = sio.loadmat(item)
                 self.SSP[ssp_key] = {'c': D['SSP_Dr1m'], 'depth': D['Depthr'][0,:]}
             elif isinstance(item, dict):
-                c, depth, s, lon, lat = self.compute_SSP_from_flow(**item)
+                c, depth, s, lon, lat, h = self.compute_SSP_from_flow(**item)
                 self.SSP[ssp_key] = {'c': c[::-1,...].T, 'depth': depth[::-1,...], 
-                                     's': s, 'lon': lon, 'lat': lat}
+                                     's': s, 'lon': lon, 'lat': lat, 'h': h}
        
 
    
@@ -113,8 +113,16 @@ class bellhop(object):
                 d = (lon[1]-grd['lon_rho'])**2 + (lat[1]-grd['lat_rho'])**2
                 i1_eta, i1_xi = np.unravel_index(d.argmin(), d.shape)
                 #
-                i_eta = slice(i0_eta, i1_eta, np.sign(i1_eta-i0_eta))
-                i_xi = slice(i0_xi, i1_xi, np.sign(i1_xi-i0_xi))
+                if i1_eta>i0_eta:
+                    i_eta = slice(i0_eta, i1_eta+1)
+                else:
+                    i_eta = slice(i0_eta, i1_eta-1,-1)
+                if i1_xi>i0_xi:
+                    i_xi = slice(i0_xi, i1_xi+1)
+                else:
+                    i_xi = slice(i0_xi, i1_xi-1,-1)
+                #i_eta = slice(i0_xi, i1_xi, np.sign(i1_xi-i0_xi))
+                #i_xi = slice(i0_xi, i1_xi, np.sign(i1_xi-i0_xi))
                 #
                 #T = ds['temp'].isel(eta_rho = i_eta, xi_rho = i_xi)
                 #S = ds['salt'].isel(eta_rho = i_eta, xi_rho = i_xi)
@@ -126,12 +134,14 @@ class bellhop(object):
         # build a uniform grid, output depth levels, should be an option
         if z.ndim == 3:
             z_uni = z.isel(eta_rho = 0, xi_rho = 0).values
+            #z_uni[-1,:,:] = 0.
         elif z.ndim == 1:
             z_uni = z.values
+            #z_uni[-1] = 0.
                 
         if not section:
-            T_uni = interp2z(z_uni, z.values, T.values).squeeze()
-            S_uni = interp2z(z_uni, z.values, S.values).squeeze()
+            T_uni = interp2z(z_uni, z.values, T.values, extrap=True).squeeze()
+            S_uni = interp2z(z_uni, z.values, S.values, extrap=True).squeeze()
             #T_uni = interp2z_1d(z_uni[:,[0]], z[:,0], T.values)
             #S_uni = interp2z_1d(z_uni[:,[0]], z[:,0], S.values)
             #lat = grd.lat_rho[i_eta,i_xi]
@@ -141,33 +151,35 @@ class bellhop(object):
         else:
             # number of horizontal points in the section
             Np = int(np.sqrt( float(i1_eta-i0_eta)**2 + float(i1_xi-i0_xi)**2 ))
-            S = np.arange(Np).astype(float)/Np
-            c = np.zeros((z_uni.shape[0],Np))
+            S = np.arange(Np+1).astype(float)/Np
+            c_s = np.zeros((z_uni.shape[0],Np))
+            h_s = np.zeros((Np))
             print('The transect will contain %d horizontal points' %Np)
             #
             xx, yy = np.meshgrid(np.arange(2.),np.arange(2.))
-            for i, s in enumerate(S):
-                s_eta = i0_eta + s *(i1_eta-i0_eta)
+            for i, s in enumerate(S[:-1]):
+                s_eta = i0_eta + s *np.abs(i1_eta-i0_eta)
                 i_eta = int(s_eta)
-                di_eta = int(s *(i1_eta-i0_eta))
+                di_eta = int(s *np.abs(i1_eta-i0_eta))
                 #
-                s_xi = i0_xi + s *(i1_xi-i0_xi)
+                s_xi = i0_xi + s *np.abs(i1_xi-i0_xi)
                 i_xi = int(s_xi)
-                di_xi = int(s *(i1_xi-i0_xi))
+                di_xi = int(s *np.abs(i1_xi-i0_xi))
                 #
                 lz = z.isel(eta_rho = slice(di_eta, di_eta+2), xi_rho = slice(di_xi, di_xi+2))
                 lT = ds['temp'].isel(eta_rho = slice(i_eta,i_eta+2), xi_rho = slice(i_xi,i_xi+2))
                 lS = ds['salt'].isel(eta_rho = slice(i_eta,i_eta+2), xi_rho = slice(i_xi,i_xi+2))
                 #
-                T_uni = interp2z(z_uni, lz.values, lT.values).squeeze()
-                S_uni = interp2z(z_uni, lz.values, lS.values).squeeze()
+                T_uni = interp2z(z_uni, lz.values, lT.values, extrap=True).squeeze()
+                S_uni = interp2z(z_uni, lz.values, lS.values, extrap=True).squeeze()
                 lc = get_soundc(T_uni, S_uni, z_uni[:,None,None], lon, lat).squeeze()
+                h_s[i] = interpolate.interp2d(xx, yy, -lz.isel(s_rho=0).values, kind='linear')(s_xi-i_xi, s_eta-i_eta)
                 for k in range(z_uni.size):
-                    c[k,i] = interpolate.interp2d(xx, yy, lc[k,...], kind='linear')(s_xi-i_xi, s_eta-i_eta)
-                #print(i)
+                    c_s[k,i] = interpolate.interp2d(xx, yy, lc[k,...], kind='linear')(s_xi-i_xi, s_eta-i_eta)
+                print('%d/%d' %(i,Np))
             #
-            slon = lon[0] + s*lon[1]
-            slat = lat[0] + s*lat[1]
+            lon_s = lon[0] + s*lon[1]
+            lat_s = lat[0] + s*lat[1]
             s = S * earth_dist(lon,lat)
         
         #
@@ -200,7 +212,7 @@ class bellhop(object):
             cp = plt.contour(grd['lon_rho'], grd['lat_rho'], grd['h'],[500,1000,2500],colors='white')
             plt.clabel(cp, inline=1, fmt='%d', fontsize=10)
                 
-        return c, -z_uni, s, slon, slat
+        return c_s, -z_uni, s, lon_s, lat_s, h_s 
             
     
           

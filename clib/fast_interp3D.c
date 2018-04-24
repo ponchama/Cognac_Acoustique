@@ -67,7 +67,7 @@ static PyObject* fast_interp3D(PyObject* self, PyObject* args)
     NY = PyArray_DIM(vs,1);
     NX = PyArray_DIM(vs,2);
 
-    // Output array must have the same size as input ndarray 
+    // Output array size
     npy_intp dims[] = {NZT,NY,NX};
     vt = (PyArrayObject*)PyArray_SimpleNew(nd, dims, NPY_FLOAT64);
     if (vt == NULL) return NULL;

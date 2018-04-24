@@ -214,21 +214,28 @@ def interp2z_1d(z0, z, v):
     from scipy.interpolate import interp1d
     return interp1d(z,v, kind='cubic')(z0)
 
-def interp2z(z0, z, v):
+def interp2z(z0, z, v, extrap=False):
     ''' Interpolate on a horizontally uniform grid
     '''
     import clib.fast_interp3D as fi  # OpenMP accelerated C based interpolator
+    #
     if v.ndim == 1 or z.ndim == 1 :
-        v = v.squeeze()
-        z = z.squeeze()
-        return fi.interp(z0.astype('float64'),z[:,None,None].astype('float64'),
-                         v[:,None,None])
+        lz = z.squeeze()[:,None,None]
+        lv = v.squeeze()[:,None,None]
     elif v.ndim == 2 :
-        return fi.interp(z0.astype('float64'),z[...,None].astype('float64'),
-                         v[...,None])
+        lz = z[...,None]
+        lv = v[...,None]
     else:
-        # assumes input files are indeed 3D
-        return fi.interp(z0.astype('float64'), z.astype('float64'), v)
+        lz = z[...]
+        lv = v[...]
+    #
+    if extrap:
+        zmin = np.min(z0)-1.
+        lv = np.vstack((lv[[0],...], lv))
+        lz = np.vstack((zmin+0.*lz[[0],...], lz))
+    #
+    vi = fi.interp(z0.astype('float64'), lz.astype('float64'), lv.astype('float64'))
+    return vi
 
 
 #--------------------------------------------------------------------------------------------
