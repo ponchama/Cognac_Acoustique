@@ -66,9 +66,9 @@ class bellhop(object):
                 c, depth, s, lon, lat = self.compute_SSP_from_flow(**item)
                 self.SSP[ssp_key] = {'c': c[::-1,...].T, 'depth': depth[::-1,...], 
                                      's': s, 'lon': lon, 'lat': lat}
-                
-              
-            
+       
+
+   
             
     def compute_SSP_from_flow(self, file=None, datadir=None, hgrid_file=None, \
                               lon=None, lat=None, i_eta=None, i_xi=None, L=None, \
@@ -225,7 +225,10 @@ class bellhop(object):
         print('Output file is : '+file_env)
             
         # load sound speed profile
-        c = self.SSP[ssp_key]['c'][Issp,:]
+        if np.ndim(self.SSP[ssp_key]['c']) == 1 : 
+            c = self.SSP[ssp_key]['c'][:]
+        else : 
+            c = self.SSP[ssp_key]['c'][Issp,:]
         depth = self.SSP[ssp_key]['depth'][:]
 
         # Create environment file
@@ -258,7 +261,48 @@ class bellhop(object):
             f.write('%.1f  %.1f  %.1f \t  !Steps zbox(m) rbox(km)\n' %(
                 0.0,self.params['zmax']+450,self.params['rmax']+1.))
 
-      
+        
+    
+    
+    def generate_sspfile(self, ssp_key, file_env=None, SSP_depth_step=1):
+        ''' 
+        Parameters
+        ----------
+        ssp_key: str
+            Key referencing which sound speed profile should be used
+        Issp : int
+            Sound speed profile index in SSP file
+        file_env : str
+            Name of the env file to generate (.env)
+        '''
+ 
+        # name of the environnement file
+        if file_env is None:
+            file_env = self.params['file_env']
+            
+        # name of ssp file
+        file_ssp = file_env[:-4]+'.ssp'
+        print('Output file is : '+file_ssp)
+            
+        # load sound speed profile
+        r = self.SSP[ssp_key]['s']  # range
+        c = self.SSP[ssp_key]['c']
+        depth = self.SSP[ssp_key]['depth'][:]
+
+        # Create environment file
+        with open(file_ssp, 'w') as f:
+            f.write('%d\n' %np.shape(r)[0])
+            for i in range (len(r)): 
+                f.write('%.1f ' % r[i])
+            f.write('\n')
+                
+            for i in range(0,len(depth),SSP_depth_step):
+                for j in range (len(r)):
+                    f.write('%.1f ' % c[j,i])
+                f.write('\n')
+
+
+                
             
     def plotray (self, filename = None):
         ''' 
@@ -520,7 +564,10 @@ class bellhop(object):
         Issp : int
             Sound speed profile index in SSP file
         '''
-        c = self.SSP[ssp_key]['c'][Issp,:]
+        if np.ndim(self.SSP[ssp_key]['c']) == 1 : 
+            c = self.SSP[ssp_key]['c'][:]
+        else : 
+            c = self.SSP[ssp_key]['c'][Issp,:]
         depth = self.SSP[ssp_key]['depth'][:]
 
         plt.figure(figsize=(10,3))
@@ -564,7 +611,7 @@ class bellhop(object):
           
 
         ### read file ssp
-        fid = open(file_SSP,'r')
+        fid = open(filename,'r')
         
         NProf = int( np.fromfile( fid, float, 1, sep = " " ) )  # number of profiles 
         rProf = np.fromfile( fid, float, NProf, sep = " " )     # range of each profile
@@ -579,7 +626,7 @@ class bellhop(object):
 
 
         ### read file env (to have depths)
-        file_env = file_SSP[:-4]+'.env'
+        file_env = filename[:-4]+'.env'
         fid = open (file_env,'r')
         f = fid.readlines()
 
@@ -597,7 +644,7 @@ class bellhop(object):
             plt.subplot (1,NProf,i+1)
             plt.plot(cmat[:,i],depth)
             plt.gca().invert_yaxis()
-            plt.title('%d km' %rProf[i])
+            plt.title('%d m' %rProf[i])
 
         #plt.savefig('profiles_'+file_SSP[:-4], dpi=100)
 
@@ -606,8 +653,8 @@ class bellhop(object):
         plt.gca().invert_yaxis()
         cbar = plt.colorbar()
         cbar.set_label("sound speed (m/s)")
-        plt.title ("Range-dependent SSP - "+file_SSP[:-4])
-        plt.xlabel("range (km)")
+        plt.title ("Range-dependent SSP - "+filename[:-4])
+        plt.xlabel("range (m)")
         plt.ylabel("depth (m)")
         plt.contour(rProf, depth,cmat,10,colors='w',linestyles='dotted')
 
