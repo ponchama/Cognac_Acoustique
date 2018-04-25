@@ -97,6 +97,224 @@ def dist(a,b):
     return np.sqrt((a['x']-b['x'])**2+(a['y']-b['y'])**2)
 
 
+
+#----------------------------------------------------------------------------------------------------
+
+def geolocalize(r, sources, x0=None, disp=True):
+
+    # source float position (known)
+    x_s = np.array([s.x_s for s in sources])
+    y_s = np.array([s.y_s for s in sources])
+    # transductor positions (unknown)
+    x_t = np.array([s.x_t[0] for s in sources])
+    y_t = np.array([s.y_t[0] for s in sources])
+    # background velocity
+    c_b = np.array([s.c_b for s in sources])    
+    # emission time
+    t_e = np.zeros_like(x_s)
+    # measured arrival times
+    t_r_tilda = t_e + np.sqrt((r.x-x_t)**2+(r.y-y_t)**2)/np.array([s.c[0] for s in sources]) \
+                - r.dt
+
+    Ns = len(sources)
+    idx = slice(3, 3+2*Ns, 2)
+    idy = slice(4, 3+2*Ns, 2)
+
+    # weights
+    W = [1./np.array(r.e_x**2),
+         1./np.array(r.e_dt**2),
+         1./np.array([s.e_dx**2 for s in sources]), 
+         1./np.array([s.e_c**2 for s in sources])]
+
+    # default background guess
+    if x0 is None:
+        x0 = np.zeros((3+3*Ns))
+        x0[0] = 1.e3
+    
+    def func(x, W):
+        dt = x[2]
+        dx = x[idx]
+        dy = x[idy]
+        # background values
+        dt0 = x0[2]
+        dx0 = x0[idx]
+        dy0 = x0[idy]
+        #
+        _d = np.sqrt((x[0]-x_s-dx)**2 + (x[1]-y_s-dy)**2)
+        _t = (t_r_tilda + dt - t_e)
+        #
+        J = ( (x[0]-x0[0])**2 + (x[1]-x0[1])**2 )*W[0]
+        J += (dt-dt0)**2*W[1]
+        J += np.mean( ( (dx-dx0)**2+ (dy-dy0)**2 )*W[2] )
+        J += np.mean( ( _d/_t - c_b )**2 *W[3] )
+        return J
+
+    def jac(x, W):
+        dt = x[2]
+        dx = x[idx]
+        dy = x[idy]
+        # background values
+        dt0 = x0[2]
+        dx0 = x0[idx]
+        dy0 = x0[idy]
+        #
+        _d = np.sqrt((x[0]-x_s-dx)**2 + (x[1]-y_s-dy)**2)
+        _t = (t_r_tilda + dt - t_e)
+        #
+        jac = np.zeros_like(x0)
+        jac[0] = 2.*(x[0]-x0[0])*W[0] + np.mean( 2.*(x[0]-x_s-dx)/_d/_t*( _d/_t - c_b ) *W[3] )
+        jac[1] = 2.*(x[1]-x0[1])*W[0] + np.mean( 2.*(x[1]-y_s-dy)/_d/_t*( _d/_t - c_b ) *W[3] )
+        jac[2] = 2.*(dt-dt0)*W[1] + np.mean( -2.*_d/_t**2*( _d/_t - c_b ) *W[3] )
+        jac[idx] = 2.*(dx-dx0)*W[2] + np.mean( -2.*(x[0]-x_s-dx)/_d/_t*( _d/_t - c_b ) *W[3] )
+        jac[idy] = 2.*(dy-dy0)*W[2] + np.mean( -2.*(x[1]-y_s-dy)/_d/_t*( _d/_t - c_b ) *W[3] )
+        return jac
+    
+    # no jacobian, 'nelder-mead' or 'powell'
+    #res = minimize(func, x0, args=(W,), method='nelder-mead', options={'maxiter': 10000, 'disp': disp})    
+    # with jacobian
+    res = minimize(func, x0, args=(W,), jac=jac, method='BFGS', options={'maxiter': 1000, 'disp': disp})    
+        
+    # extract the solution
+    x = res.x[0]
+    y = res.x[1]
+    dt = res.x[2]
+    dx = res.x[idx]
+    dy = res.x[idy]
+    
+    success = res.success
+    message = res.message        
+    
+    return x, y, dt, dx, dy, success, message, res
+
+
+
+#----------------------------------------------------------------------------------------------------
+
+def geolocalize_hard(r, sources, x0=None, disp=True):
+
+    # source float position (known)
+    x_s = np.array([s.x_s for s in sources])
+    y_s = np.array([s.y_s for s in sources])
+    # transductor positions (unknown)
+    x_t = np.array([s.x_t[0] for s in sources])
+    y_t = np.array([s.y_t[0] for s in sources])
+    # emission time
+    t_e = np.zeros_like(x_s)
+    # measured arrival times
+    t_r_tilda = t_e + np.sqrt((r.x-x_t)**2+(r.y-y_t)**2)/np.array([s.c[0] for s in sources]) \
+                - r.dt
+
+    Ns = len(sources)
+    idx = slice(3, 3+2*Ns, 2)
+    idy = slice(4, 3+2*Ns, 2)
+    idc = slice(3+2*Ns,3+3*Ns)
+
+    # weights
+    W = [1./np.array(r.e_x**2),
+         1./np.array(r.e_dt**2),
+         1./np.array([s.e_dx**2 for s in sources]), 
+         1./np.array([s.e_c**2 for s in sources])]        
+
+    # default background guess
+    if x0 is None:
+        x0 = np.zeros((3+3*Ns))
+        x0[0] = 1.e3
+    
+    def func(x, W):
+        dt = x[2]
+        dx = x[idx]
+        dy = x[idy]
+        dc = x[idc]
+        # background values
+        dt0 = x0[2]
+        dx0 = x0[idx]
+        dy0 = x0[idy]
+        dc0 = x0[idc]        
+        return ( (x[0]-x0[0])**2 + (x[1]-x0[1])**2 )*W[0] \
+                + (dt-dt0)**2*W[1] \
+                + np.mean( ( (dx-dx0)**2+ (dy-dy0)**2 )*W[2] ) \
+                + np.mean( (dc-dc0)**2*W[3] )
+
+    def jac(x, W):
+        dt = x[2]
+        dx = x[idx]
+        dy = x[idy]
+        dc = x[idc]
+        # background values
+        dt0 = x0[2]
+        dx0 = x0[idx]
+        dy0 = x0[idy]
+        dc0 = x0[idc]        
+        #
+        jac = np.zeros_like(x)
+        jac[0] = 2.*(x[0]-x0[0])*W[0]
+        jac[1] = 2.*(x[1]-x0[1])*W[0]
+        jac[2] = 2.*(dt-dt0)*W[1]
+        jac[idx] = 2.*(dx-dx0)*W[2]
+        jac[idy] = 2.*(dy-dy0)*W[2]
+        jac[idc] = 2.*(dc-dc0)*W[3]
+        return jac
+    
+    # add constraints
+    cons = []
+    for i, s in enumerate(sources):
+        # ! late binding gotcha !
+        def cfun(x, i=i, s=s):
+            dt = x[2]
+            dx = x[idx]
+            dy = x[idy]
+            dc = x[idc]
+            return np.array([(x[0] - s.x_s - dx[i])**2 + (x[1] - s.y_s - dy[i])**2 
+                              - (s.c_b + dc[i])**2 *(t_r_tilda[i] + dt - t_e[i])**2])
+        # ! late binding gotcha !
+        def cjac(x, i=i, s=s):
+            dt = x[2]
+            dx = x[idx]
+            dy = x[idy]
+            dc = x[idc]
+            #
+            jac = np.zeros_like(x)
+            jac[0] = 2.*(x[0] - s.x_s - dx[i])
+            jac[1] = 2.*(x[1] - s.y_s - dy[i])
+            jac[2] = -2.*(s.c_b + dc[i])**2 * (t_r_tilda[i] + dt - t_e[i])
+            jac[idx][i] = -2.*(x[0] - s.x_s - dx[i])
+            jac[idy][i] = -2.*(x[1] - s.y_s - dy[i])
+            jac[idc][i] = - 2.*(s.c_b + dc[i]) * (t_r_tilda[i] + dt - t_e[i])**2
+            return jac
+        #
+        cons.append({'type': 'eq', 'fun' : cfun, 'jac' : cjac})
+        
+    #'disp': False, 'iprint': 1, 'eps': 1.4901161193847656e-08, 'func': None, 'maxiter': 100, 'ftol': 1e-06}
+    ftol = 1e-06
+    print('ftol = %.e' %ftol)
+    res = minimize(func, x0, args=(W,), jac=jac, constraints=cons, method='SLSQP', 
+                   options={'maxiter': 1000, 'disp': disp, 'eps': 1.4e-08, 'ftol': ftol})    
+        
+    # extract the solution
+    x = res.x[0]
+    y = res.x[1]
+    dt = res.x[2]
+    dx = res.x[idx]
+    dy = res.x[idy]
+    dc = res.x[idc]
+    
+    success = res.success
+    message = res.message
+    
+    
+    # hard constraints verified ? 
+    
+    for i, s in enumerate(sources):
+        aa = (x - s.x_s - dx[i])**2 + (y - s.y_s - dy[i])**2 - (s.c_b + dc[i])**2 *(t_r_tilda[i] + dt - t_e[i])**2
+        print( 'source %d : %.1f' %(i+1,aa))
+        #
+        #print(' source %d : %.1f' %(i+1, cons[i]['fun'](res.x)))
+        print(cons[i]['jac'](res.x))
+        
+    
+    return x, y, dt, dx, dy, dc, success, message, res
+
+
 def geolocalize_xydt(r, sources, x0=None, disp=True):
 
     # source float position (known)
@@ -183,127 +401,3 @@ def geolocalize_xydt(r, sources, x0=None, disp=True):
         print(cons[i]['jac'](res.x))
         
     return x, y, dt, success, message, res
-
-
-def geolocalize(r, sources, x0=None, disp=True):
-
-    # source float position (known)
-    x_s = np.array([s.x_s for s in sources])
-    y_s = np.array([s.y_s for s in sources])
-    # transductor positions (unknown)
-    x_t = np.array([s.x_t[0] for s in sources])
-    y_t = np.array([s.y_t[0] for s in sources])
-    # emission time
-    t_e = np.zeros_like(x_s)
-    # measured arrival times
-    t_r_tilda = t_e + np.sqrt((r.x-x_t)**2+(r.y-y_t)**2)/np.array([s.c[0] for s in sources]) \
-                - r.dt
-
-    Ns = len(sources)
-    idx = slice(3, 3+2*Ns, 2)
-    idy = slice(4, 3+2*Ns, 2)
-    idc = slice(3+2*Ns,3+3*Ns)
-
-    # weights
-    W = [1./np.array(r.e_x**2),
-         1./np.array(r.e_dt**2),
-         1./np.array([s.e_dx**2 for s in sources]), 
-         1./np.array([s.e_c**2 for s in sources])]        
-
-    # default background guess
-    if x0 is None:
-        x0 = np.zeros((3+3*Ns))
-        x0[0] = 1.e3
-    
-    def func(x, W):
-        dt = x[2]
-        dx = x[idx]
-        dy = x[idy]
-        dc = x[idc]
-        # background values
-        dt0 = x0[2]
-        dx0 = x0[idx]
-        dy0 = x0[idy]
-        dc0 = x0[idc]        
-        return ( (x[0]-x0[0])**2 + (x[1]-x0[1])**2 )*W[0] \
-                + (dt-dt0)**2*W[1] \
-                + np.mean( ( (dx-dx0)**2+ (dy-dy0)**2 )*W[2] ) \
-                + np.mean( (dc-dc0)**2*W[3] )
-
-    def jac(x, W):
-        dt = x[2]
-        dx = x[idx]
-        dy = x[idy]
-        dc = x[idc]
-        # background values
-        dt0 = x0[2]
-        dx0 = x0[idx]
-        dy0 = x0[idy]
-        dc0 = x0[idc]        
-        #
-        jac = np.zeros_like(x)
-        jac[2] = 2.*(dt-dt0)*W[0]
-        jac[idx] = 2.*(dx-dx0)*W[1]
-        jac[idy] = 2.*(dy-dy0)*W[1]
-        jac[idc] = 2.*(dc-dc0)*W[2]
-        return jac
-    
-    # add constraints
-    cons = []
-    for i, s in enumerate(sources):
-        # ! late binding gotcha !
-        def cfun(x, i=i, s=s):
-            dt = x[2]
-            dx = x[idx]
-            dy = x[idy]
-            dc = x[idc]
-            return np.array([(x[0] - s.x_s - dx[i])**2 + (x[1] - s.y_s - dy[i])**2 
-                              - (s.c_b + dc[i])**2 *(t_r_tilda[i] + dt - t_e[i])**2])
-        # ! late binding gotcha !
-        def cjac(x, i=i, s=s):
-            dt = x[2]
-            dx = x[idx]
-            dy = x[idy]
-            dc = x[idc]
-            #
-            jac = np.zeros_like(x)
-            jac[0] = 2.*(x[0] - s.x_s - dx[i])
-            jac[1] = 2.*(x[1] - s.y_s - dy[i])
-            jac[2] = -2.*(s.c_b + dc[i])**2 * (t_r_tilda[i] + dt - t_e[i])
-            jac[idx][i] = -2.*(x[0] - s.x_s - dx[i])
-            jac[idy][i] = -2.*(x[1] - s.y_s - dy[i])
-            jac[idc][i] = - 2.*(s.c_b + dc[i]) * (t_r_tilda[i] + dt - t_e[i])**2
-            return jac
-        #
-        cons.append({'type': 'eq', 'fun' : cfun, 'jac' : cjac})
-        
-    #'disp': False, 'iprint': 1, 'eps': 1.4901161193847656e-08, 'func': None, 'maxiter': 100, 'ftol': 1e-06}
-    ftol = 1e-06
-    print('ftol = %.e' %ftol)
-    res = minimize(func, x0, args=(W,), jac=jac, constraints=cons, method='SLSQP', 
-                   options={'maxiter': 1000, 'disp': disp, 'eps': 1.4e-08, 'ftol': ftol})    
-        
-    # extract the solution
-    x = res.x[0]
-    y = res.x[1]
-    dt = res.x[2]
-    dx = res.x[idx]
-    dy = res.x[idy]
-    dc = res.x[idc]
-    
-    success = res.success
-    message = res.message
-    
-    
-    # hard constraints verified ? 
-    
-    for i, s in enumerate(sources):
-        aa = (x - s.x_s - dx[i])**2 + (y - s.y_s - dy[i])**2 - (s.c_b + dc[i])**2 *(t_r_tilda[i] + dt - t_e[i])**2
-        print( 'source %d : %.1f' %(i+1,aa))
-        #
-        #print(' source %d : %.1f' %(i+1, cons[i]['fun'](res.x)))
-        print(cons[i]['jac'](res.x))
-        
-    
-    return x, y, dt, dx, dy, dc, success, message, res
-        
