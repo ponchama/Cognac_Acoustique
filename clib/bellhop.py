@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import scipy.io as sio
 from scipy import interpolate
+import mpl_toolkits.mplot3d.art3d as art3d
 
 from glob import glob
 
@@ -29,10 +30,10 @@ class bellhop(object):
         rmax = 100.
         simu = 'simulation'
         self.params = {'name': simu, 'freq': 3000., \
-                       'zs': 50., 'zmax': zmax, \
-                       'rmax': rmax, 'NDepth': zmax + 1., \
+                       'zs': 100., 'zmin': 0., 'zmax': zmax, \
+                       'rmin':0., 'rmax': rmax, 'NDepth': zmax + 1., \
                        'NRange': rmax * 100. + 1., \
-                       'ALimites': [-15., 15.], 'file_type': 'R'}
+                       'ALimites': [-15., 15.], 'bottom':1600., 'file_type': 'R'}
        
         self.params.update(kwargs)
         self.params.update(NDepth = self.params['zmax'] + 1.)
@@ -256,22 +257,22 @@ class bellhop(object):
                 f.write('%.1f %.1f /\n' %(depth[i], c[i]))
             #
             f.write('\'A*\' %.1f\n' %0.0)
-            f.write('%.1f %.1f %.1f %.1f %.1f %.1f\n'%(depth_max,1800,10,2,0.1,0)) #gravier
+            f.write('%.1f %.1f %.1f %.1f %.1f %.1f\n'%(depth_max,self.params['bottom'],10,2,0.1,0)) #gravier
             #
             f.write('%d \t  !NSD\n' %1)
             f.write('%d / \t  !Source depth\n' % self.params['zs'])
+            
             f.write('%d \t  !Number receiver depth\n' % self.params['NDepth'])
-            f.write('%.1f %.1f / \t  !Receiver depths\n' %(0.0, self.params['zmax']))
-
-            f.write('%d \t  !Number of ranges\n' % self.params['NRange'])
-            f.write('%.1f  %.1f / \t  !Range limites\n'%(0., self.params['rmax']))
-            f.write('\'%s\'\n' %self.params['file_type'])  # R : .ray ; IB : .shd
-            #f.write('\'IB\'\n')            #! On choisit de travailler en champ incoherent
+            f.write('%.1f %.1f / \t  !Receiver depths\n' %(self.params['zmin'], self.params['zmax']))     
+            f.write('%d \t  !Number of ranges\n' % self.params['NRange'])            
+            f.write('%.1f  %.1f / \t  !Range limits\n' %(self.params['rmin'], self.params['rmax']))
+                       
+            f.write('\'%s\'\n' %self.params['file_type'])  # R : .ray ; IB : .shd ; A : .arr
             f.write('%d  \t  !NBeams\n'%0)      #! Bellhop calcule le nombre optimal de rayons
             f.write('%.1f  %.1f  / \t  !Angles limites\n' %( 
                 self.params['ALimites'][0],self.params['ALimites'][1]))
             f.write('%.1f  %.1f  %.1f \t  !Steps zbox(m) rbox(km)\n' %(
-                0.0,self.params['zmax']+450,self.params['rmax']+1.))
+                0.0,self.params['zmax']+2000,self.params['rmax']+1.))
 
         
     
@@ -313,8 +314,203 @@ class bellhop(object):
                     f.write('%.1f ' % c[j,i])
                 f.write('\n')
 
+    
+    
+    def read_arrivals_asc (self, filename = None, Narrmx = 200): 
+        ''' read the arrival time/amplitude data computed by Bellhop
+        
+        Parameters
+        ----------
+        filename: str
+            Name of the Arrivals file (.arr)
+        Narrmx : int
+            Maximum number of arrivals allowed
+            
+        Out
+        ----------
+        Arr : dic
+            Contains all the arrivals information
+        Pos : dic
+            Contains the positions of source and receivers
+            
+        '''
+        
+        if filename is None :
+            filename = self.params['name']+'.arr'
+            
+        file = Path("./%s" %filename)
+        if not file.is_file():
+            print("Le fichier %s n'exite pas dans ce répertoire." %filename)
+            return
+        
+        Pos = {}
+        Arr = {}
+        # open the file
+        fid = open(filename,'r')
+        
+        # read the header info
+        theline = str( fid.readline() )
+        data = theline.split()
+        freq  = float( data[0] )
+        Nsd = int( data[1] )     # number of source depths
+        Nrd = int( data[2] )     # number of receiver depths
+        Nrr = int( data[3] )     # number of receiver ranges
+        
+        theline = str( fid.readline() )
+        datai = theline.split()
+        Pos['s'] = {'depth': [float(datai[i]) for i in range(len(datai))]}
+        theline = str( fid.readline() )
+        data_d = theline.split()
+        theline = str( fid.readline() )
+        data_r = theline.split() 
+        Pos['r'] = {'depth': [float(data_d[i]) for i in range(len(data_d))], \
+                    'range': [float(data_r[i]) for i in range(len(data_r))]}
+         
+        
+        # loop to read all the arrival info (delay and amplitude)
 
+        A         = np.zeros( (Nrr, Narrmx, Nrd, Nsd) )   # complex pressure amplitude of each ray at the receiver
+        delay     = np.zeros( (Nrr, Narrmx, Nrd, Nsd) )   # travel time in seconds from source to receiver
+        SrcAngle  = np.zeros( (Nrr, Narrmx, Nrd, Nsd) )   # angle at which the ray left the source (pos is down, neg is up)
+        RcvrAngle = np.zeros( (Nrr, Narrmx, Nrd, Nsd) )   # angle at which the ray is passing through the receiver
+        NumTopBnc = np.zeros( (Nrr, Narrmx, Nrd, Nsd) )   # number of surface bounces
+        NumBotBnc = np.zeros( (Nrr, Narrmx, Nrd, Nsd) )   # number of bottom bounces
+        Narr      = np.zeros( (Nrr, Nrd, Nsd) )           # number of arrivals
+        
+        
+        for isd in range (Nsd):
+            Narrmx2 = int ( fid.readline() ) # max. number of arrivals to follow
+            print ('Max.number of arrivals for source index %d is %d' %(isd, Narrmx2))
+            for ird in range (Nrd) : 
+                for ir in range (Nrr):
+                    narr = int ( fid.readline() )   # number of arrivals
+                    if narr > 0 :                   # do we have any arrivals ? 
+                        
+                        da = np.zeros((narr,8))
+                        for i in range (narr): 
+                            theline = str( fid.readline() )
+                            datai = theline.split()
+                            da[i,:] = datai
+                        
+                        narr = min(narr,Narrmx)  #we'll keep no more than Narrmx values
+                        Narr [ir, ird, isd] = narr
+                        
+                        A [ir, :narr, ird, isd] = da [:narr,0] * np.exp (1j * da[:narr,1]*np.pi/180)
+                        delay [ir, :narr, ird, isd] = da[:narr,2] + 1j * da[:narr,3]
+                        SrcAngle [ir, :narr, ird, isd] = da[:narr,4]
+                        RcvrAngle [ir, :narr, ird, isd] = da[:narr,5]
+                        NumTopBnc [ir, :narr, ird, isd] = da[:narr,6]
+                        NumBotBnc [ir, :narr, ird, isd] = da[:narr,7]
+        
+        Arr = {'A':A, 'delay':delay, 'SrcAngle':SrcAngle, 'RcvrAngle':RcvrAngle, \
+               'NumTopBnc': NumTopBnc, 'NumBotBnc':NumBotBnc, 'Narr' : Narr}    
+        
+        fid.close()  
+        return Arr, Pos 
+    
+    
+    
+    def plotarr(self, filename = None, irr=0, ird=0, isd=0):
+        ''' plot the arrivals calculated by Bellhop
+        
+        Parameters
+        ----------
+        filename: str
+            Name of the Arrivals file (.arr)
+        irr : int
+            Index of receiver range
+        ird : int
+            Index of receiver depth
+        isd : int
+            Index of source depth 
+        '''
+        
+        # read
+        Narrmx = 5000
+        Arr, Pos = self.read_arrivals_asc(filename, Narrmx)
+        
+        # stem plot for a single receiver
+        plt.figure()
+        Narr = int(Arr['Narr'][irr, ird, isd])
+
+        for i in range (Narr) : 
+            markerline, stemlines, baseline = plt.stem( [Arr['delay'][irr, i, ird, isd]],\
+                                               [abs(Arr['A'][irr, i, ird, isd])])
+
+            if np.logical_and ( Arr['NumTopBnc'][irr, i,ird,isd] == 0, Arr['NumBotBnc'][irr, i,ird,isd] == 0):
+                plt.setp(stemlines, color = 'r')
+                plt.setp(markerline, color = 'r')
+        
+            elif Arr['NumBotBnc'][irr, i,ird,isd] == 0:
+                plt.setp(stemlines, color = 'b')
+                plt.setp(markerline, color = 'b')
+        
+            else : 
+                plt.setp(stemlines, color = 'k')
+                plt.setp(markerline, color = 'k')
+ 
+        plt.ylim(ymin=0)
+        plt.xlabel('Time (s)')
+        plt.ylabel('Amplitude')
+        plt.title('Source depth : %.1fm -- Receiver depth : %.1fm -- Receiver range : %.1fkm' \
+                  % (Pos['s']['depth'][isd], Pos['r']['depth'][ird], Pos['r']['range'][irr]/1000.))
+        
+ 
+    
+    
+         # depth-time stem plot
+
+#        fig = plt.figure()
+#        ax = fig.add_subplot(1, 1, 1, projection='3d')
+#        for ird1 in range (np.shape(Arr['A'])[2]):
+#            Narr = int(Arr['Narr'][irr,ird,isd])
+#            x = Arr['delay'][irr,:Narr,ird,isd]
+#            y = Pos['r']['depth'][ird1]*np.ones_like(x)
+#            z = abs(Arr['A'][irr, :Narr, ird, isd])
+#
+#            for xi, yi, zi in zip(x, y, z):        
+#                line=art3d.Line3D(*zip((xi, yi, 0), (xi, yi, zi)), marker='o', markevery=(1, 1))
+#                ax.add_line(line)
+#        
+#        ax.set_xlim3d(6, 7)
+#        ax.set_ylim3d(400, 600)
+#        ax.set_zlim3d(0, 1e-4)    
+#        
+#        plt.xlabel('Time (s)')
+#        plt.ylabel('Depth (m)')
+#        plt.title ('Source depth : %.1fm -- Receiver range : %.1fkm' \
+#                  % (Pos['s']['depth'][isd], Pos['r']['range'][irr]/1000.))
+#        plt.show()
+            
+        
+#        # range-time stem plot
                 
+#        fig1 = plt.figure()
+#        ax = fig1.add_subplot(1, 1, 1, projection='3d')
+#        for irr in range (np.shape(Arr['A'])[0]):
+#            Narr = int(Arr['Narr'][irr,ird,isd])
+#            x = Arr['delay'][irr,:Narr,ird,isd]
+#            y = Pos['r']['range'][irr]*np.ones_like(x)
+#            z = abs(Arr['A'][irr, :Narr, ird, isd])
+#
+#            for xi, yi, zi in zip(x, y, z):        
+#                line=art3d.Line3D(*zip((xi, yi, 0), (xi, yi, zi)), marker='o', markevery=(1, 1))
+#                ax.add_line(line)
+#        
+#        ax.set_xlim3d(6, 7)
+#        ax.set_ylim3d(9500,10500)
+#        ax.set_zlim3d(0, 1e-4)    
+#        
+#        plt.xlabel('Time (s)')
+#        plt.ylabel('Range (m)')
+#        plt.title ('Source depth : %.1fm -- Receiver depth : %.1fm' \
+#                  % (Pos['s']['depth'][isd], Pos['r']['depth'][ird]))
+#        plt.show()
+        
+        
+        
+        
+        
             
     def plotray (self, filename = None):
         ''' 
@@ -398,13 +594,13 @@ class bellhop(object):
                         color = 'k'
 
                    ## plot  
-                   plt.plot( r, -z,  color = color )
-                   plt.axis([rmin,rmax,-zmax,-zmin])
-
-
+                   plt.plot( r/1000., -z,  color = color )
+                   plt.axis([rmin/1000.,rmax/1000.,-zmax,-zmin])
+        
         plt.title(filename[:-4])
-        plt.xlabel('range (m)')
+        plt.xlabel('range (km)')
         plt.ylabel('profondeur (m)')
+        plt.grid()
         #plt.savefig('plotray_'+filename[:-4], dpi=100)
 
         fid.close()
