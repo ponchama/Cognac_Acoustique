@@ -23,6 +23,9 @@ __pycache__/
 *.env
 *.ray
 *.shd
+*.arr
+*.bty
+*.prt
 *.nc
 
 # fig and movies
