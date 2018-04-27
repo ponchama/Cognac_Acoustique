@@ -384,7 +384,7 @@ class bellhop(object):
             Narrmx2 = int ( fid.readline() ) # max. number of arrivals to follow
             print ('Max.number of arrivals for source index %d is %d' %(isd, Narrmx2))
             for ird in range (Nrd) : 
-                print('receiver depth number %d/%d' %(ird+1, Nrd))
+                #print('receiver depth number %d/%d' %(ird+1, Nrd))
                 for ir in range (Nrr):
                     narr = int ( fid.readline() )   # number of arrivals
                     if narr > 0 :                   # do we have any arrivals ? 
@@ -602,7 +602,11 @@ class bellhop(object):
                         color = 'k'
 
                    ## plot  
-                   plt.plot( r/1000., -z,  color = color, label = '%.2fm' %d)
+                   if dist :
+                        label = '%.2fm' %d
+                   else : 
+                        label = None
+                   plt.plot( r/1000., -z,  color = color, label = label)
                    plt.axis([rmin/1000.,rmax/1000.,-zmax,-zmin])
         
         plt.title(filename[:-4])
