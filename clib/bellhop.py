@@ -32,12 +32,14 @@ class bellhop(object):
         self.params = {'name': simu, 'freq': 3000., \
                        'zs': 100., 'zmin': 0., 'zmax': zmax, \
                        'rmin':0., 'rmax': rmax, 'NDepth': zmax + 1., \
-                       'NRange': rmax * 100. + 1., \
+                       'NRange': rmax * 100. + 1., 'zbox': zmax + 500., 'rbox': rmax + 1.,\
                        'ALimites': [-15., 15.], 'bottom':1600., 'file_type': 'R'}
        
         self.params.update(kwargs)
         self.params.update(NDepth = self.params['zmax'] + 1.)
         self.params.update(NRange = self.params['rmax']*100 + 1.)
+        self.params.update(zbox = self.params['zmax'] + 500.)
+        self.params.update(rbox = self.params['rmax'] + 1.)
         
         self.params['file_bathy'] = self.params['name']+'.bty'
         self.params['file_env'] = self.params['name']+'.env'
@@ -272,7 +274,7 @@ class bellhop(object):
             f.write('%.1f  %.1f  / \t  !Angles limites\n' %( 
                 self.params['ALimites'][0],self.params['ALimites'][1]))
             f.write('%.1f  %.1f  %.1f \t  !Steps zbox(m) rbox(km)\n' %(
-                0.0,self.params['zmax']+2000,self.params['rmax']+1.))
+                0.0,self.params['zbox'],self.params['rbox']))
 
         
     
@@ -316,7 +318,7 @@ class bellhop(object):
 
     
     
-    def read_arrivals_asc (self, filename = None, Narrmx = 200): 
+    def read_arrivals_asc (self, filename = None, Narrmx = 50): 
         ''' read the arrival time/amplitude data computed by Bellhop
         
         Parameters
@@ -382,6 +384,7 @@ class bellhop(object):
             Narrmx2 = int ( fid.readline() ) # max. number of arrivals to follow
             print ('Max.number of arrivals for source index %d is %d' %(isd, Narrmx2))
             for ird in range (Nrd) : 
+                print('receiver depth number %d/%d' %(ird+1, Nrd))
                 for ir in range (Nrr):
                     narr = int ( fid.readline() )   # number of arrivals
                     if narr > 0 :                   # do we have any arrivals ? 
@@ -410,7 +413,7 @@ class bellhop(object):
     
     
     
-    def plotarr(self, filename = None, irr=0, ird=0, isd=0):
+    def plotarr(self, Arr, Pos, irr=0, ird=0, isd=0, filename = None,):
         ''' plot the arrivals calculated by Bellhop
         
         Parameters
@@ -426,8 +429,8 @@ class bellhop(object):
         '''
         
         # read
-        Narrmx = 5000
-        Arr, Pos = self.read_arrivals_asc(filename, Narrmx)
+        #Narrmx = 5000
+        #Arr, Pos = self.read_arrivals_asc(filename, Narrmx)
         
         # stem plot for a single receiver
         plt.figure()
@@ -512,7 +515,7 @@ class bellhop(object):
         
         
             
-    def plotray (self, filename = None):
+    def plotray (self, filename = None, dist = False):
         ''' 
         Parameters
         ----------
@@ -582,6 +585,11 @@ class bellhop(object):
                    zmin = min( [ min(z), zmin ] )
                    zmax = max( [ max(z), zmax ] )
 
+                   ## traveled distance 
+                   d = 0
+                   for i in range (len(r)-1):
+                       d += np.sqrt((r[i+1]-r[i])**2 + (z[i+1]-z[i])**2) 
+                        
                    ## Color of the ray
                    #RED : no reflexion on top and bottom
                    if np.logical_and (NumTopBnc==0, NumBotBnc==0):
@@ -594,13 +602,16 @@ class bellhop(object):
                         color = 'k'
 
                    ## plot  
-                   plt.plot( r/1000., -z,  color = color )
+                   plt.plot( r/1000., -z,  color = color, label = '%.2fm' %d)
                    plt.axis([rmin/1000.,rmax/1000.,-zmax,-zmin])
         
         plt.title(filename[:-4])
         plt.xlabel('range (km)')
         plt.ylabel('profondeur (m)')
         plt.grid()
+        
+        if dist : 
+            plt.legend()
         #plt.savefig('plotray_'+filename[:-4], dpi=100)
 
         fid.close()
