@@ -33,7 +33,7 @@ class bellhop(object):
                        'zs': 100., 'zmin': 0., 'zmax': zmax, \
                        'rmin':0., 'rmax': rmax, 'NDepth': zmax + 1., \
                        'NRange': rmax * 100. + 1., 'zbox': zmax + 500., 'rbox': rmax + 1.,\
-                       'ALimites': [-15., 15.], 'bottom':1600., 'file_type': 'R'}
+                       'ALimites': [-15., 15.], 'NBeams' : 0, 'bottom':1600., 'file_type': 'R'}
        
         self.params.update(kwargs)
         self.params.update(NDepth = self.params['zmax'] + 1.)
@@ -270,7 +270,7 @@ class bellhop(object):
             f.write('%.1f  %.1f / \t  !Range limits\n' %(self.params['rmin'], self.params['rmax']))
                        
             f.write('\'%s\'\n' %self.params['file_type'])  # R : .ray ; IB : .shd ; A : .arr
-            f.write('%d  \t  !NBeams\n'%0)      #! Bellhop calcule le nombre optimal de rayons
+            f.write('%d  \t  !NBeams\n'%self.params['NBeams'])      #! Bellhop calcule le nombre optimal de rayons
             f.write('%.1f  %.1f  / \t  !Angles limites\n' %( 
                 self.params['ALimites'][0],self.params['ALimites'][1]))
             f.write('%.1f  %.1f  %.1f \t  !Steps zbox(m) rbox(km)\n' %(
@@ -622,6 +622,147 @@ class bellhop(object):
 
         
         
+        
+        
+        
+        
+        
+    def plotE (self, filename = None, dist = False, plot=True):
+        ''' 
+        Parameters
+        ----------
+        filename : str
+            Output file from bellhop simulation (.ray) 
+        '''
+
+        if filename is None :
+            filename = self.params['name']+'.ray'
+
+        file = Path("./%s" %filename)
+        if not file.is_file():
+            print("Le fichier %s n'exite pas dans ce répertoire." %filename)
+            return
+
+        Nsxyz       = np.zeros(3) 
+        NBeamAngles = np.zeros(2)
+
+        fid = open(filename,'r')
+        title = fid.readline()
+        freq  = float( fid.readline() )
+        theline = str( fid.readline() )
+        datai = theline.split()
+        Nsxyz[0] = int( datai[0] )
+        Nsxyz[1] = int( datai[1] )
+        Nsxyz[2] = int( datai[2] )
+        theline = str( fid.readline() )
+        datai = theline.split()
+        NBeamAngles[0] = int( datai[0] )
+        NBeamAngles[1] = int( datai[1] )
+        DEPTHT = float( fid.readline() )
+        DEPTHB = float( fid.readline() )
+        Type   = fid.readline()
+        Nsx = int( Nsxyz[0] )
+        Nsy = int( Nsxyz[1] )
+        Nsz = int( Nsxyz[2] )
+        Nalpha = int( NBeamAngles[0] )
+        Nbeta  = int( NBeamAngles[1] )
+        # axis limits
+        rmin =  1.0e9
+        rmax = -1.0e9
+        zmin =  1.0e9
+        zmax = -1.0e9
+
+        #plt.figure(figsize=(9,6))
+
+        SrcAngle  = np.zeros( (Nsz, Nalpha) )   # angle at which the ray left the source (pos is down, neg is up)
+        NumTopBnc = np.zeros( (Nsz, Nalpha) )   # number of surface bounces
+        NumBotBnc = np.zeros( (Nsz, Nalpha) )   # number of bottom bounces
+        Dist      = np.zeros( (Nsz, Nalpha) )   # traveled distance
+
+        for isz in range(Nsz):
+            for ibeam in range(Nalpha):
+                theline = str( fid.readline() )
+                l = len( theline )
+                if l > 0:
+                    alpha0 = float( theline )
+                    theline = str( fid.readline() )
+                    datai = theline.split()
+                    nsteps    = int( datai[0] )
+                    numTopBnc = int( datai[1] )
+                    numBotBnc = int( datai[2] )
+                    r = np.zeros(nsteps)
+                    z = np.zeros(nsteps)
+                    for j in range(nsteps):
+                        theline = str(fid.readline())
+                        rz = theline.split()
+                        r[j] = float( rz[0] )
+                        z[j] = float( rz[1] )        
+                    rmin = min( [ min(r), rmin ] )
+                    rmax = max( [ max(r), rmax ] )
+                    zmin = min( [ min(z), zmin ] )
+                    zmax = max( [ max(z), zmax ] )
+
+                    ## traveled distance 
+                    d = 0
+                    for i in range (len(r)-1):
+                        d += np.sqrt((r[i+1]-r[i])**2 + (z[i+1]-z[i])**2) 
+                    
+                    
+                    if plot : 
+                        ## Color of the ray
+                        #RED : no reflexion on top and bottom
+                        if np.logical_and (numTopBnc==0, numBotBnc==0):
+                            color = 'r'
+                        #BLUE : no reflexion on bottom
+                        elif numBotBnc==0 :
+                            color = 'b'
+                        #BLACK : reflexion on top and bottom
+                        else : 
+                            color = 'k'
+
+                        ## plot  
+                        if dist :
+                            label = '%.2fm' %d
+                        else : 
+                            label = None
+
+                        plt.plot( r/1000., -z,  color = color, label = label)
+                        plt.axis([rmin/1000.,rmax/1000.,-zmax,-zmin])
+                    
+                   
+
+                    SrcAngle[isz,ibeam]  = alpha0
+                    NumTopBnc[isz,ibeam] = numTopBnc
+                    NumBotBnc[isz,ibeam] = numBotBnc
+                    Dist[isz,ibeam]      = d
+
+                else : 
+                    SrcAngle[isz,ibeam]  = np.NaN
+                    NumTopBnc[isz,ibeam] = np.NaN
+                    NumBotBnc[isz,ibeam] = np.NaN
+                    Dist[isz,ibeam]      = np.NaN
+                    
+        if plot : 
+            plt.title(filename[:-4])
+            plt.xlabel('range (km)')
+            plt.ylabel('profondeur (m)')
+            plt.grid()
+
+            if dist : 
+                plt.legend()
+            #plt.savefig('plotray_'+filename[:-4], dpi=100)
+
+
+        dictE = {'SrcAngle':SrcAngle[~np.isnan(SrcAngle)], 'NumTopBnc': NumTopBnc[~np.isnan(NumTopBnc)], \
+                 'NumBotBnc':NumBotBnc[~np.isnan(NumBotBnc)], 'Dist' : Dist[~np.isnan(Dist)]}    
+        fid.close()
+
+        return dictE    
+        
+        
+        
+        
+
        
     def readshd(self, filename=None):
         ''' 
