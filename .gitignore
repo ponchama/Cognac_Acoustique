@@ -27,6 +27,7 @@ __pycache__/
 *.bty
 *.prt
 *.nc
+*.npy
 
 # fig and movies
 *.png
