@@ -150,7 +150,9 @@ class bellhop(object):
             #lat = grd.lat_rho[i_eta,i_xi]
             c = get_soundc(T_uni, S_uni, z_uni, lon, lat).squeeze()
             #
+            #slon, slat, s = lon, lat, None
             slon, slat, s = lon, lat, None
+            
         else:
             # number of horizontal points in the section
             Np = int(np.sqrt( float(i1_eta-i0_eta)**2 + float(i1_xi-i0_xi)**2 ))
@@ -214,10 +216,14 @@ class bellhop(object):
             
             cp = plt.contour(grd['lon_rho'], grd['lat_rho'], grd['h'],[500,1000,2500],colors='white')
             plt.clabel(cp, inline=1, fmt='%d', fontsize=10)
-                
-        return c_s, -z_uni, s, lon_s, lat_s, h_s 
+          
+        
+        if not section : 
+            return c, -z_uni ,s , slon, slat, h    
+        else : 
+            return c_s, -z_uni, s, lon_s, lat_s, h_s 
             
-    
+
           
         
         
@@ -237,7 +243,7 @@ class bellhop(object):
         # name of the environnement file
         if file_env is None:
             file_env = self.params['file_env']
-        print('Output file is : '+file_env)
+        #print('Output file is : '+file_env)
             
         # load sound speed profile
         if np.ndim(self.SSP[ssp_key]['c']) == 1 : 
@@ -413,7 +419,7 @@ class bellhop(object):
     
     
     
-    def plotarr(self, Arr, Pos, irr=0, ird=0, isd=0, filename = None,):
+    def plotarr(self, Arr, Pos, irr=0, ird=0, isd=0, filename = None):
         ''' plot the arrivals calculated by Bellhop
         
         Parameters
@@ -438,7 +444,7 @@ class bellhop(object):
 
         for i in range (Narr) : 
             markerline, stemlines, baseline = plt.stem( [Arr['delay'][irr, i, ird, isd]],\
-                                               [abs(Arr['A'][irr, i, ird, isd])])
+                                               [abs(Arr['A'][irr, i, ird, isd])])            
 
             if np.logical_and ( Arr['NumTopBnc'][irr, i,ird,isd] == 0, Arr['NumBotBnc'][irr, i,ird,isd] == 0):
                 plt.setp(stemlines, color = 'r')
