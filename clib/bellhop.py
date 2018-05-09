@@ -1,4 +1,6 @@
 from pathlib import Path
+import os
+import pickle
 import numpy as np 
 import xarray as xr
 import matplotlib.pyplot as plt
@@ -517,9 +519,20 @@ class bellhop(object):
 #        plt.show()
         
         
-        
-        
-        
+    
+    def save_dict (self, folder, dictio, name) : 
+        pickle_out = open(os.path.join(folder, name+".pickle"),"wb")
+        pickle.dump(dictio, pickle_out)
+        pickle_out.close()
+
+    def load_dict (self, folder, name) :
+        pickle_in = open(os.path.join(folder, name+".pickle"),"rb")
+        new_dict = pickle.load(pickle_in)
+        return(new_dict)
+    
+   
+    
+     
             
     def plotray (self, filename = None, dist = False):
         ''' 
@@ -1031,13 +1044,202 @@ class bellhop(object):
         #plt.savefig('range-dependent SSP_'+file_SSP[:-4], dpi=100)
 
         
+        
+
+
+
+    def direct(self, Nrr, Nrd, Nsd, Pos, Arr): 
+        ''' For each receiver, gives the nature of the maximum amplitude 
+            ray to be received : direct or reflected ? 
+        
+        Parameters
+        ----------
+        Nrr : int
+            Number of receiver ranges
+        Nrd : int
+            Number of receiver depths
+        Nsd : int
+            Number of source depths
+        Pos : dic
+            Contains the positions of source and receivers (output from read_arrivals_asc)
+        Arr : dic
+            Contains all the arrivals information (output from read_arrivals_asc)
+            
+        Out
+        ----------
+        Dir : array
+            -1 if direct ray // 1 if bottom reflected // NaN if no arrival
+        Nb_ref : array
+            Contains the number of reflexions of the ray with the amplitude max
+        '''
+
+        Dir = np.zeros( (Nrr, Nrd, Nsd) )
+        Nb_ref = np.zeros( (Nrr, Nrd, Nsd) )
+
+        for isd1 in range (Nsd):
+            for ird1 in range (Nrd) : 
+                for irr1 in range (Nrr) :
+                    Narr = int(Arr['Narr'][irr1, ird1, isd1])
+                    if not Narr ==0 :
+                        A = abs(Arr['A'][irr1, :Narr, ird1, isd1])
+                        NumBotBnc = Arr['NumBotBnc'][irr1,:Narr, ird1, isd1]
+                        NumTopBnc = Arr['NumTopBnc'][irr1,:Narr, ird1, isd1]
+                        n_bot_max = NumBotBnc[np.where(A==np.max(A))][0]  # NumBotBnc of ray with max of amplitude
+                        n_top_max = NumTopBnc[np.where(A==np.max(A))][0]
+                        Nb_ref [irr1, ird1, isd1] = n_bot_max + n_top_max
+
+                        if n_bot_max ==0 :
+                            Dir [irr1, ird1, isd1] = -1
+                        else : 
+                            Dir [irr1,ird1,isd1] = 1
+                    else : 
+                        Dir [irr1,ird1,isd1] = np.NaN
+                        Nb_ref [irr1, ird1, isd1] = np.NaN
+
+        return Dir, Nb_ref
 
 
     
     
+    def plot_direct (self, Pos, Dir, plot_nan = False) : 
+        ''' Plot the outputs from "direct" function 
+ 
+        Parameters
+        ----------
+        Pos : dic
+            Contains the positions of source and receivers (output from read_arrivals_asc)
+        Dir : array
+            -1 if direct ray // 1 if bottom reflected // NaN if no arrival
+        Nb_ref : array
+            Contains the number of reflexions of the ray with the amplitude max
+        '''
+
+        isd = 0    # source number (only 1 source here)
+        ##
+        plt.figure(figsize=(15, 4))
+        plt.subplot(1,2,1)
+        R = Pos['r']['range']
+        Z = Pos['r']['depth']
+        plt.pcolormesh(R, Z, Dir[:,:,isd].T, cmap='jet')
+        plt.title ('Blue : direct // Red : bottom-reflected')
+        plt.xlabel("range (m)")
+        plt.ylabel("depth (m)")
+        #cbar = plt.colorbar()
+        plt.gca().invert_yaxis()
+        ##
+        plt.subplot(1,2,2)
+        tot = np.shape(Dir)[0]*np.shape(Dir)[1]
+        direct = np.shape( np.where(Dir==-1)[0] )[0]
+        no_ray = np.shape(np.where(np.isnan(Dir)))[1]
+        bot_ref = np.shape( np.where(Dir>=1)[0] )[0]
+        
+        if plot_nan : 
+            name = ['direct', 'no ray', 'bottom reflection']
+            data = [direct, no_ray, bot_ref]
+            patches, texts, autotexts = plt.pie(data, labels=name, \
+                                                colors=['darkblue','y','firebrick'], \
+                                                autopct='%1.1f%%', startangle=90, shadow=True)  
+        else : 
+            name = ['direct', 'bottom reflection']
+            data = [direct, bot_ref]
+            patches, texts, autotexts = plt.pie(data, labels=name, \
+                                                colors=['darkblue','firebrick'], \
+                                                autopct='%1.1f%%', startangle=70, shadow=True)  
+            
+        for t in autotexts:
+            t.set_color('w')
+            t.set_size('x-large')
+        plt.axis('equal')
+        plt.title ('Ray containing the amplitude max')
+        #plt.show()
+
+
+
     
     
+     
+    def direct_first_arr(self, Nrr, Nrd, Nsd, Pos, Arr, treshold = 10.):   
+        ''' For each receiver, gives the nature of the first 
+            ray to be detected (>treshold) : direct or reflected ? 
+        
+        Parameters
+        ----------
+        Nrr : int
+            Number of receiver ranges
+        Nrd : int
+            Number of receiver depths
+        Nsd : int
+            Number of source depths
+        Pos : dic
+            Contains the positions of source and receivers (output from read_arrivals_asc)
+        Arr : dic
+            Contains all the arrivals information (output from read_arrivals_asc)
+        treshold : float 
+            Detection treshold : minimum value (in dB) for the receiver to detect the signal
+            
+        Out
+        ----------
+        RL_first : array 
+            Contains the received level (RL) for the first arrival at each receiver 
+        Dir : array
+            -1 if direct ray // 1 if bottom reflected // NaN if no arrival
+        Nb_ref : array
+            Contains the number of reflexions of the ray with the amplitude max
+        '''
+        
+        # sonar equation
+        SL = 185                 # Souce level (dB)
+        NL = 81.7                # Noise level (dB)
+        DI = 0                   # Directivity index (dB)
+
+        B = 200                  # bandwidth (Hz)
+        T = 1                    # transmitted signal duration (s)
+        PG = 10.0*np.log10(B*T)  # Processing gain (dB)
+        #RT  = SL - TL - NL + DI + PG 
     
+    
+        RL_first = np.zeros( (Nrr, Nrd, Nsd) )
+        Dir = np.zeros( (Nrr, Nrd, Nsd) )
+        Nb_ref = np.zeros( (Nrr, Nrd, Nsd) )
+
+        for isd1 in range (Nsd):
+            for ird1 in range (Nrd) : 
+                for irr1 in range (Nrr) :
+                    Narr = int(Arr['Narr'][irr1, ird1, isd1])
+                    if not Narr ==0 :
+                        NumBotBnc = Arr['NumBotBnc'][irr1,:Narr, ird1, isd1]
+                        NumTopBnc = Arr['NumTopBnc'][irr1,:Narr, ird1, isd1]
+                        A = abs(Arr['A'][irr1, :Narr, ird1, isd1])  # amplitude 
+                        TL = - 20.0*np.log10(A)
+                        RL = SL - TL - NL +DI + PG    # received level 
+                        t = Arr['delay'][irr1, :Narr, ird1, isd1]
+                        t_ok = t[np.where(RL > treshold)]
+
+
+                        if len(t_ok > 0): 
+                            t_min = np.min(t_ok)
+                            RL_first [irr1,ird1,isd1] = RL[np.where(t==t_min)][0]
+
+                            nbot_first = NumBotBnc[np.where(t==t_min)][0]         # NumBotBnc of first ray detected
+                            ntop_first = NumTopBnc[np.where(t==t_min)][0]         # NumTopBnc of first ray detected
+                            Nb_ref [irr1, ird1, isd1] = nbot_first + ntop_first  # total number of reflections
+
+                            if nbot_first ==0 :
+                                Dir [irr1, ird1, isd1] = -1   # direct ray 
+                            else : 
+                                Dir [irr1,ird1,isd1] = 1      # bottom-reflected ray                  
+
+                        else : 
+                            RL_first [irr1,ird1,isd1] = np.NaN
+                            Dir [irr1,ird1,isd1] = np.NaN
+                            Nb_ref [irr1,ird1,isd1] = np.NaN
+
+                    else : 
+                        RL_first [irr1,ird1,isd1] = np.NaN
+                        Dir [irr1,ird1,isd1] = np.NaN
+                        Nb_ref [irr1,ird1,isd1] = np.NaN
+        
+        return (RL_first, Dir, Nb_ref)
     
     
     
