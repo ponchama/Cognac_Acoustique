@@ -28,6 +28,7 @@ __pycache__/
 *.prt
 *.nc
 *.npy
+*.pickle
 
 # fig and movies
 *.png
