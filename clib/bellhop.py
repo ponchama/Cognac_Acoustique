@@ -35,7 +35,7 @@ class bellhop(object):
                        'zs': 100., 'zmin': 0., 'zmax': zmax, \
                        'rmin':0., 'rmax': rmax, 'NDepth': zmax + 1., \
                        'NRange': rmax * 100. + 1., 'zbox': zmax + 500., 'rbox': rmax + 1.,\
-                       'ALimites': [-15., 15.], 'NBeams' : 0, 'bottom':1600., 'file_type': 'R'}
+                       'ALimites': [-90., 90.], 'NBeams' : 0, 'bottom':1600., 'file_type': 'R'}
        
         self.params.update(kwargs)
         self.params.update(NDepth = self.params['zmax'] + 1.)
