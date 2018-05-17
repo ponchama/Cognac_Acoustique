@@ -441,7 +441,7 @@ class bellhop(object):
         #Arr, Pos = self.read_arrivals_asc(filename, Narrmx)
         
         # stem plot for a single receiver
-        plt.figure()
+        #plt.figure()
         Narr = int(Arr['Narr'][irr, ird, isd])
 
         for i in range (Narr) : 
