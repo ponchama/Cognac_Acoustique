@@ -31,7 +31,7 @@ class bellhop(object):
         zmax = 2550.
         rmax = 100.
         simu = 'simulation'
-        self.params = {'name': simu, 'freq': 3000., \
+        self.params = {'name': simu, 'freq': 3000., 'hypothesis':'SVWT', \
                        'zs': 100., 'zmin': 0., 'zmax': zmax, \
                        'rmin':0., 'rmax': rmax, 'NDepth': zmax + 1., \
                        'NRange': rmax * 100. + 1., 'zbox': zmax + 500., 'rbox': rmax + 1.,\
@@ -183,7 +183,7 @@ class bellhop(object):
                 h_s[i] = interpolate.interp2d(xx, yy, -lz.isel(s_rho=0).values, kind='linear')(s_xi-i_xi, s_eta-i_eta)
                 for k in range(z_uni.size):
                     c_s[k,i] = interpolate.interp2d(xx, yy, lc[k,...], kind='linear')(s_xi-i_xi, s_eta-i_eta)
-                print('%d/%d' %(i,Np))
+                #print('%d/%d' %(i,Np))
             #
             lon_s = lon[0] + s*lon[1]
             lat_s = lat[0] + s*lat[1]
@@ -229,7 +229,7 @@ class bellhop(object):
           
         
         
-    def generate_envfile(self, ssp_key, Issp=0, file_env=None, SSP_depth_step=1):
+    def generate_envfile(self, ssp_key, Issp=0, file_env=None, SSP_depth_step=1, c=None):
         ''' 
         Parameters
         ----------
@@ -248,10 +248,12 @@ class bellhop(object):
         #print('Output file is : '+file_env)
             
         # load sound speed profile
-        if np.ndim(self.SSP[ssp_key]['c']) == 1 : 
-            c = self.SSP[ssp_key]['c'][:]
-        else : 
-            c = self.SSP[ssp_key]['c'][Issp,:]
+        if c is None :  
+            if np.ndim(self.SSP[ssp_key]['c']) == 1 : 
+                c = self.SSP[ssp_key]['c'][:]
+            else : 
+                c = self.SSP[ssp_key]['c'][Issp,:]
+                
         depth = self.SSP[ssp_key]['depth'][:]
 
         # Create environment file
@@ -259,7 +261,7 @@ class bellhop(object):
             f.write('\'Range dep, Gaussian beams\'\n')
             f.write('%.1f\n' % self.params['freq'])
             f.write('%.d\n' %1)
-            f.write('\'SVWT\'\n')
+            f.write('\'%s\'\n' %self.params['hypothesis'])
             #
             depth_max = depth.max() # ! Bathymetrie maximale
             f.write('%d %.1f %.1f\n'%(0, 0.0, depth_max))
@@ -287,7 +289,7 @@ class bellhop(object):
         
     
     
-    def generate_sspfile(self, ssp_key, file_env=None, SSP_depth_step=1):
+    def generate_sspfile(self, ssp_key, file_env=None, SSP_depth_step=1, r=None, c=None):
         ''' 
         Parameters
         ----------
@@ -308,19 +310,21 @@ class bellhop(object):
         print('Output file is : '+file_ssp)
             
         # load sound speed profile
-        r = self.SSP[ssp_key]['s']  # range
-        c = self.SSP[ssp_key]['c']
+        if r is None : 
+            r = self.SSP[ssp_key]['s']  # range
+        if c is None : 
+            c = self.SSP[ssp_key]['c']
         depth = self.SSP[ssp_key]['depth'][:]
-
+        
         # Create environment file
         with open(file_ssp, 'w') as f:
-            f.write('%d\n' %np.shape(r)[0])
-            for i in range (len(r)): 
-                f.write('%.1f ' % r[i])
+            f.write('%d\n' %np.shape(c)[0])
+            for i in range (len(c)): 
+                f.write('%.1f ' % (r[i]/1000.))
             f.write('\n')
                 
             for i in range(0,len(depth),SSP_depth_step):
-                for j in range (len(r)):
+                for j in range (len(c)):
                     f.write('%.1f ' % c[j,i])
                 f.write('\n')
 
@@ -938,7 +942,7 @@ class bellhop(object):
   
         
     
-    def plotssp (self,ssp_key, Issp=0, y_zoom =150):
+    def plotssp (self,ssp_key, Issp=0, zoom = True, y_zoom =150):
         ''' 
         Parameters
         ----------
@@ -953,30 +957,40 @@ class bellhop(object):
             c = self.SSP[ssp_key]['c'][Issp,:]
         depth = self.SSP[ssp_key]['depth'][:]
 
-        plt.figure(figsize=(10,3))
+        if zoom : 
         
-        plt.subplot(1,2,1)
-        plt.plot(c, depth)
-        plt.gca().invert_yaxis()
-        plt.grid()
-        plt.title('celerity profile : '+self.params['name']+'_SSP%.d' %(Issp+1))
-        plt.xlabel('celerity (m/s)')
-        plt.ylabel('depth (m)')
-    
-        plt.subplot(1,2,2)
-        plt.plot(c, depth)
-        plt.ylim(-10, y_zoom)
-        plt.gca().invert_yaxis()
-        plt.grid()
-        plt.title('Zoom')
-        plt.xlabel('celerity (m/s)')
-        plt.ylabel('depth (m)')
+            plt.figure(figsize=(10,3))
+
+            plt.subplot(1,2,1)
+            plt.plot(c, depth)
+            plt.gca().invert_yaxis()
+            plt.grid()
+            plt.title('celerity profile : '+self.params['name']+'_SSP%.d' %(Issp+1))
+            plt.xlabel('celerity (m/s)')
+            plt.ylabel('depth (m)')
+
+            plt.subplot(1,2,2)
+            plt.plot(c, depth)
+            plt.ylim(-10, y_zoom)
+            plt.gca().invert_yaxis()
+            plt.grid()
+            plt.title('Zoom')
+            plt.xlabel('celerity (m/s)')
+            plt.ylabel('depth (m)')
         
-        
+        else : 
+            plt.plot(c, depth)
+            plt.gca().invert_yaxis()
+            plt.grid()
+            plt.title('celerity profile : '+self.params['name'])
+            plt.xlabel('celerity (m/s)')
+            plt.ylabel('depth (m)')
+            plt.grid()
+
 
     
     
-    def plotssp2D (self, filename=None):
+    def plotssp2D (self, filename=None, subplot = False):
         '''
         Parameters
         ----------
@@ -1020,24 +1034,25 @@ class bellhop(object):
 
         fid.close()
 
-
+        
         ### plot ssp2D 
-        plt.figure(figsize=(17,8))
-        for i in range(NProf):
-            plt.subplot (1,NProf,i+1)
-            plt.plot(cmat[:,i],depth)
-            plt.gca().invert_yaxis()
-            plt.title('%d m' %rProf[i])
+        if subplot : 
+            plt.figure(figsize=(17,8))
+            for i in range(NProf):
+                plt.subplot (1,NProf,i+1)
+                plt.plot(cmat[:,i],depth)
+                plt.gca().invert_yaxis()
+                plt.title('%d m' %rProf[i])
 
         #plt.savefig('profiles_'+file_SSP[:-4], dpi=100)
 
-        plt.figure(figsize=(12,8))
-        plt.pcolormesh(rProf, depth, cmat, shading='gouraud', cmap ='jet')
+        #plt.figure(figsize=(9,6))
+        plt.pcolormesh(rProf, depth, cmat, shading='gouraud')#, cmap ='jet')
         plt.gca().invert_yaxis()
         cbar = plt.colorbar()
         cbar.set_label("sound speed (m/s)")
         plt.title ("Range-dependent SSP - "+filename[:-4])
-        plt.xlabel("range (m)")
+        plt.xlabel("range (km)")
         plt.ylabel("depth (m)")
         plt.contour(rProf, depth,cmat,10,colors='w',linestyles='dotted')
 
