@@ -21,6 +21,7 @@ __pycache__/
 # data files
 *.mat
 *.env
+*.ssp
 *.ray
 *.shd
 *.arr
