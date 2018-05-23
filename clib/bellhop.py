@@ -68,9 +68,9 @@ class bellhop(object):
                 D = sio.loadmat(item)
                 self.SSP[ssp_key] = {'c': D['SSP_Dr1m'], 'depth': D['Depthr'][0,:]}
             elif isinstance(item, dict):
-                c, depth, s, lon, lat, h = self.compute_SSP_from_flow(**item)
+                c, depth, s, lon, lat, h, Sal, Temp = self.compute_SSP_from_flow(**item)
                 self.SSP[ssp_key] = {'c': c[::-1,...].T, 'depth': depth[::-1,...], 
-                                     's': s, 'lon': lon, 'lat': lat, 'h': h}
+                                     's': s, 'lon': lon, 'lat': lat, 'h': h, 'Sal': Sal, 'Temp' : Temp}
        
 
    
@@ -160,6 +160,10 @@ class bellhop(object):
             Np = int(np.sqrt( float(i1_eta-i0_eta)**2 + float(i1_xi-i0_xi)**2 ))
             S = np.arange(Np+1).astype(float)/Np
             c_s = np.zeros((z_uni.shape[0],Np))
+            temp_s = np.zeros((z_uni.shape[0],Np))
+            sal_s = np.zeros((z_uni.shape[0],Np))
+            
+            
             h_s = np.zeros((Np))
             print('The transect will contain %d horizontal points' %Np)
             #
@@ -183,6 +187,10 @@ class bellhop(object):
                 h_s[i] = interpolate.interp2d(xx, yy, -lz.isel(s_rho=0).values, kind='linear')(s_xi-i_xi, s_eta-i_eta)
                 for k in range(z_uni.size):
                     c_s[k,i] = interpolate.interp2d(xx, yy, lc[k,...], kind='linear')(s_xi-i_xi, s_eta-i_eta)
+                    temp_s[k,i] = interpolate.interp2d(xx, yy, T_uni[k,...], kind='linear')(s_xi-i_xi, s_eta-i_eta)
+                    sal_s[k,i] = interpolate.interp2d(xx, yy, S_uni[k,...], kind='linear')(s_xi-i_xi, s_eta-i_eta)
+                    
+                    
                 #print('%d/%d' %(i,Np))
             #
             lon_s = lon[0] + s*lon[1]
@@ -221,9 +229,9 @@ class bellhop(object):
           
         
         if not section : 
-            return c, -z_uni ,s , slon, slat, h    
+            return c, -z_uni ,s , slon, slat, h, S_uni, T_uni    
         else : 
-            return c_s, -z_uni, s, lon_s, lat_s, h_s 
+            return c_s, -z_uni, s, lon_s, lat_s, h_s, sal_s, temp_s #S_uni, T_uni 
             
 
           
@@ -538,7 +546,7 @@ class bellhop(object):
     
      
             
-    def plotray (self, filename = None, dist = False):
+    def plotray (self, filename = None, dist = False, colors=None, zoom=False):
         ''' 
         Parameters
         ----------
@@ -614,16 +622,22 @@ class bellhop(object):
                        d += np.sqrt((r[i+1]-r[i])**2 + (z[i+1]-z[i])**2) 
                         
                    ## Color of the ray
-                   #RED : no reflexion on top and bottom
-                   if np.logical_and (NumTopBnc==0, NumBotBnc==0):
-                        color = 'r'
-                   #BLUE : no reflexion on bottom
-                   elif NumBotBnc==0 :
-                        color = 'b'
-                   #BLACK : reflexion on top and bottom
-                   else : 
-                        color = 'k'
+                  
+                   if colors is None : 
+                       #RED : no reflexion on top and bottom
+                       if np.logical_and (NumTopBnc==0, NumBotBnc==0):
+                            color = 'r'
+                       #BLUE : no reflexion on bottom
+                       elif NumBotBnc==0 :
+                            color = 'b'
+                       #BLACK : reflexion on top and bottom
+                       else : 
+                            color = 'k'
 
+                   else : 
+                       color = colors
+                        
+                        
                    ## plot  
                    if dist :
                         label = '%.2fm' %d
@@ -636,6 +650,9 @@ class bellhop(object):
         plt.xlabel('range (km)')
         plt.ylabel('profondeur (m)')
         plt.grid()
+        
+        if zoom :
+            plt.ylim ([-500, 0])
         
         if dist : 
             plt.legend()
@@ -990,7 +1007,7 @@ class bellhop(object):
 
     
     
-    def plotssp2D (self, filename=None, subplot = False):
+    def plotssp2D (self, filename=None, subplot = False, zoom = None):
         '''
         Parameters
         ----------
@@ -1047,15 +1064,30 @@ class bellhop(object):
         #plt.savefig('profiles_'+file_SSP[:-4], dpi=100)
 
         #plt.figure(figsize=(9,6))
-        plt.pcolormesh(rProf, depth, cmat, shading='gouraud')#, cmap ='jet')
-        plt.gca().invert_yaxis()
-        cbar = plt.colorbar()
-        cbar.set_label("sound speed (m/s)")
-        plt.title ("Range-dependent SSP - "+filename[:-4])
-        plt.xlabel("range (km)")
-        plt.ylabel("depth (m)")
-        plt.contour(rProf, depth,cmat,10,colors='w',linestyles='dotted')
+        
+        if zoom is None :
+            plt.pcolormesh(rProf, depth, cmat, shading='gouraud')#, cmap ='jet')
+            cbar = plt.colorbar()
+            cbar.set_label("sound speed (m/s)")
+            plt.title ("Range-dependent SSP - "+filename[:-4])
+            plt.xlabel("range (km)")
+            plt.ylabel("depth (m)")
+            plt.gca().invert_yaxis()
+            plt.contour(rProf, depth,cmat,10,colors='w',linestyles='dotted')
 
+        else : 
+            plt.pcolormesh(rProf, depth[np.where(depth <= zoom)], \
+                           cmat[np.where(depth <= zoom)], shading='gouraud')
+            cbar = plt.colorbar()
+            cbar.set_label("sound speed (m/s)")
+            plt.title ("Zoom on first %.1fm" %(zoom-50))
+            plt.xlabel("range (km)")
+            plt.ylabel("depth (m)")
+            plt.ylim([0,zoom-50])
+            plt.gca().invert_yaxis()
+            plt.contour(rProf, depth,cmat,10,colors='w',linestyles='dotted')
+
+            
         #plt.savefig('range-dependent SSP_'+file_SSP[:-4], dpi=100)
 
         
