@@ -252,7 +252,8 @@ def geolocalize_xydt(r, sources, x0=None, disp=True):
     # no jacobian, 'nelder-mead' or 'powell'
     #res = minimize(func, x0, args=(W,), method='nelder-mead', options={'maxiter': 10000, 'disp': disp})    
     # with jacobian
-    res = minimize(func, x0, args=(W,), jac=jac, method='BFGS', options={'maxiter': 1000, 'disp': disp})    
+    res = minimize(func, x0, args=(W,), jac=jac, method='BFGS', options={'maxiter': 1000, \
+                                                                         'disp': disp, 'return_all': True})    
         
     # extract the solution
     x = res.x[0]
