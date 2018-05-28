@@ -99,9 +99,17 @@ class receiver(object):
 # class for space-time mapping and error
 class xtmap(object):
     ''' Mapping between distance and time with associated errors
+    This mapping can be linear, i.e. determined by a constant value of sound velocity (c_b)
+    It may be also provided by a Bellhop simulation output (not implemented)
+    Errors on this mapping are required.
+    
     Parameters
     ----------
-    
+    c_b: float
+        Sound speed velocity
+    e_c: float
+        Error on our sound speed velocity
+        
     '''
     def __init__(self, c_b=None, e_c=None, e_min=0.):
         if c_b is not None:
@@ -116,15 +124,21 @@ class xtmap(object):
             self._emap = lambda x: np.maximum(self.e_min, x*self.e_c/self.c_b**2)
         
     def t(self, x):
+        ''' Returns time of propagation given a range x
+        '''
         return self._map(x)
     
     def draw_t(self, x, Np=1):
+        ''' Draws a random value of propagation time 
+        '''
         if Np == 1 :
             return self._map(x) + np.random.randn(x.size)*self._emap(x)
         else:
             return self._map(x) + np.random.randn(x.size, Np)*self._emap(x)
     
     def e_tp(self, x):
+        ''' Returns, for a given range x, the error on propagation time
+        '''
         return self._emap(x)
         
 
@@ -133,9 +147,13 @@ def dist(a,b):
     return np.sqrt((a['x']-b['x'])**2+(a['y']-b['y'])**2)
 
 
+
 #----------------------------------------------------------------------------------------------------
 
-def geolocalize_xtmap(r, sources, pmap, x0=None, disp=True):
+#def plot_J(func, x, ):
+
+
+def geolocalize_xtmap(r, sources, pmap, x0=None, options=None, disp=True):
 
     # source float position (known)
     x_s = np.array([s.x_s for s in sources])
@@ -152,7 +170,7 @@ def geolocalize_xtmap(r, sources, pmap, x0=None, disp=True):
 
     # default background guess
     if x0 is None:
-        x0 = np.zeros ((3))
+        x0 = np.zeros((3))
         x0[0] = 1.e3
     
     def func(x, W):
@@ -163,20 +181,30 @@ def geolocalize_xtmap(r, sources, pmap, x0=None, disp=True):
         _d = np.sqrt((x[0]-x_s)**2 + (x[1]-y_s)**2)
         _t = (r.t_r_tilda - dt - t_e) # propagation time
         #
-        J = ( (x[0]-x0[0])**2 + (x[1]-x0[1])**2 )*W[0]
-        J += (dt-dt0)**2*W[1]
+        J = ( (x[0]-x0[0])**2 + (x[1]-x0[1])**2 ) *W[0]
+        J += (dt-dt0)**2 *W[1]
         J += np.mean( (_t - pmap.t(_d))**2 *W[2] )
         return J
         
     # no jacobian, 'nelder-mead' or 'powell'
-    res = minimize(func, x0, args=(W,), method='nelder-mead', options={'maxiter': 10000, 'disp': disp})    
+    if options is None:
+        options = {'maxiter': 1000, 'disp': disp, 'xatol': 1.e-4,'fatol': 1.e-4} # xatol': 0.0001, 'fatol': 0.0001,
+    res = minimize(func, x0, args=(W,), method='nelder-mead', options=options)
+
+    if not res.success:
+        print('No convergence, try with 1000 more iterations')
+        res = minimize(func, res.x, args=(W,), method='nelder-mead', options={'maxiter': 1000, 'disp': disp})
+        if not res.success:
+            print('Still no convergence')            
+            print(res)
+        #print(res['message'])
         
     # extract the solution
     x = res.x[0]
     y = res.x[1]
     dt = res.x[2]
     success = res.success
-    message = res.message        
+    message = res.message
     
     return x, y, dt, success, message, res 
 
