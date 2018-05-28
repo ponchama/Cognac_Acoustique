@@ -11,7 +11,7 @@ warnings.filterwarnings(action='ignore')
 # class for sources
 class source(object):
     ''' A source object '''
-    def __init__(self, x_s, y_s, e_dx=10., e_c=10., c_b=1500., label=''):
+    def __init__(self, x_s, y_s, e_dx=10., e_c=10., c_b=1500., label='', t_e=0.):
         '''
         Parameters
         ----------
@@ -28,6 +28,8 @@ class source(object):
         self.c_b = c_b
         self.e_c = e_c
         self.draw_celerity(e_c, c_b=c_b)
+        #
+        self.t_e = t_e
         #
         #self.tau_i=None
         self.label = ('source ' + label).strip()
@@ -94,9 +96,89 @@ class receiver(object):
         self.dt = np.random.randn(Np)*e_dt
 
 
+# class for space-time mapping and error
+class xtmap(object):
+    ''' Mapping between distance and time with associated errors
+    Parameters
+    ----------
+    
+    '''
+    def __init__(self, c_b=None, e_c=None, e_min=0.):
+        if c_b is not None:
+            self.c_b = c_b
+            self._map = lambda x: x/self.c_b
+        #
+        self.e_min = e_min
+        #
+        self.e_c = e_c
+        if e_c is not None:
+            # t = x/(c+e)
+            self._emap = lambda x: np.maximum(self.e_min, x*self.e_c/self.c_b**2)
+        
+    def t(self, x):
+        return self._map(x)
+    
+    def draw_t(self, x, Np=1):
+        if Np == 1 :
+            return self._map(x) + np.random.randn(x.size)*self._emap(x)
+        else:
+            return self._map(x) + np.random.randn(x.size, Np)*self._emap(x)
+    
+    def e_tp(self, x):
+        return self._emap(x)
+        
+
+# utils
 def dist(a,b):
     return np.sqrt((a['x']-b['x'])**2+(a['y']-b['y'])**2)
 
+
+#----------------------------------------------------------------------------------------------------
+
+def geolocalize_xtmap(r, sources, pmap, x0=None, disp=True):
+
+    # source float position (known)
+    x_s = np.array([s.x_s for s in sources])
+    y_s = np.array([s.y_s for s in sources])
+    # emission time
+    t_e = np.array([s.t_e for s in sources])
+
+    Ns = len(sources)
+
+    # weights
+    W = [1./np.array(r.e_x**2),
+         1./np.array(r.e_dt**2),
+         1./np.array([pmap.e_tp(dist(s,r))**2 for s in sources])]
+
+    # default background guess
+    if x0 is None:
+        x0 = np.zeros ((3))
+        x0[0] = 1.e3
+    
+    def func(x, W):
+        dt = x[2]
+        # background values
+        dt0 = x0[2]
+        #
+        _d = np.sqrt((x[0]-x_s)**2 + (x[1]-y_s)**2)
+        _t = (r.t_r_tilda - dt - t_e) # propagation time
+        #
+        J = ( (x[0]-x0[0])**2 + (x[1]-x0[1])**2 )*W[0]
+        J += (dt-dt0)**2*W[1]
+        J += np.mean( (_t - pmap.t(_d))**2 *W[2] )
+        return J
+        
+    # no jacobian, 'nelder-mead' or 'powell'
+    res = minimize(func, x0, args=(W,), method='nelder-mead', options={'maxiter': 10000, 'disp': disp})    
+        
+    # extract the solution
+    x = res.x[0]
+    y = res.x[1]
+    dt = res.x[2]
+    success = res.success
+    message = res.message        
+    
+    return x, y, dt, success, message, res 
 
 
 #----------------------------------------------------------------------------------------------------
