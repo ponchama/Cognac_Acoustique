@@ -146,6 +146,9 @@ class xtmap(object):
 def dist(a,b):
     return np.sqrt((a['x']-b['x'])**2+(a['y']-b['y'])**2)
 
+def dist_xyb(x,y,b):
+    return np.sqrt((x-b['x'])**2+(y-b['y'])**2)
+    
 
 
 #----------------------------------------------------------------------------------------------------
@@ -153,7 +156,15 @@ def dist(a,b):
 #def plot_J(func, x, ):
 
 
-def geolocalize_xtmap(r, sources, pmap, x0=None, options=None, disp=True):
+def geolocalize_xtmap(r, sources, pmap, x0=None, clock_drift=True,
+                      method='nelder-mead', options=None, disp=False):
+    ''' Find the location of a receiver
+    
+    Parameters:
+    -----------
+    ...
+    
+    '''
 
     # source float position (known)
     x_s = np.array([s.x_s for s in sources])
@@ -161,48 +172,108 @@ def geolocalize_xtmap(r, sources, pmap, x0=None, options=None, disp=True):
     # emission time
     t_e = np.array([s.t_e for s in sources])
 
+    # a priori float position
+    if x0 is None:
+        if clock_drift:
+            x0 = np.zeros((3))
+        else:
+            x0 = np.zeros((2))
+        #x0[0] = 1.e3
+    else:
+        if not clock_drift:
+            x0 = x0[:2]
+    x_r0 = x0[0]
+    y_r0 = x0[0]
+    
     Ns = len(sources)
 
     # weights
-    W = [1./np.array(r.e_x**2),
-         1./np.array(r.e_dt**2),
-         1./np.array([pmap.e_tp(dist(s,r))**2 for s in sources])]
+    if clock_drift:
+        W = [1./np.array(r.e_x**2),
+             1./np.array(r.e_dt**2),
+             1./np.array([pmap.e_tp(dist_xyb(x_r0, y_r0, s))**2 for s in sources])]
+    else:
+        W = [1./np.array(r.e_x**2),
+             1./np.array([pmap.e_tp(dist_xyb(x_r0, y_r0, s))**2 for s in sources])]
+        
+    #print(W)
+        
+    # scaling factor
+    #xy_sc = np.maximum(np.abs(x0[0]), np.abs(x0[1]))
+    #xy_sc = np.maximum(r.e_x,xy_sc)
+    xy_sc = 1.e3 # should find a better rationale and parametrized expression for this
+    if clock_drift:
+        dt_sc = np.maximum( r.e_dt, np.abs(x0[2]))
+        x_sc = np.array([xy_sc, xy_sc, dt_sc])
+    else:
+        x_sc = np.array([xy_sc, xy_sc])
+    #print(x_sc)
+    #print(xy_sc)
+    #print(dt_sc)
 
-    # default background guess
-    if x0 is None:
-        x0 = np.zeros((3))
-        x0[0] = 1.e3
+    # normalize x0
+    x0 = x0/x_sc
+    #print(x0)
     
-    def func(x, W):
-        dt = x[2]
-        # background values
-        dt0 = x0[2]
+    def func(x):
         #
-        _d = np.sqrt((x[0]-x_s)**2 + (x[1]-y_s)**2)
+        dx0 = (x[0]-x0[0])*xy_sc
+        dy0 = (x[1]-x0[1])*xy_sc
+        #
+        if clock_drift:
+            dt = x[2]*dt_sc
+            dt0 = x0[2]*dt_sc  # background value            
+        else:
+            dt = r.dt
+            dt0 = r.dt
+        #
+        dx_s = x[0]*xy_sc-x_s
+        dy_s = x[1]*xy_sc-y_s
+        #
+        _d = np.sqrt( dx_s**2 + dy_s**2 )
         _t = (r.t_r_tilda - dt - t_e) # propagation time
         #
-        J = ( (x[0]-x0[0])**2 + (x[1]-x0[1])**2 ) *W[0]
-        J += (dt-dt0)**2 *W[1]
-        J += np.mean( (_t - pmap.t(_d))**2 *W[2] )
+        J = ( dx0**2 + dy0**2 ) *W[0]
+        if clock_drift:
+            J += (dt-dt0**2)**2 *W[1]
+            J += np.mean( (_t - pmap.t(_d))**2 *W[2] )
+        else:
+            J += np.mean( (_t - pmap.t(_d))**2 *W[1] )
         return J
         
     # no jacobian, 'nelder-mead' or 'powell'
+    if method is None:
+        method = 'nelder-mead'
+        method = 'powell'
     if options is None:
-        options = {'maxiter': 1000, 'disp': disp, 'xatol': 1.e-4,'fatol': 1.e-4} # xatol': 0.0001, 'fatol': 0.0001,
-    res = minimize(func, x0, args=(W,), method='nelder-mead', options=options)
+        maxiter = 1000
+        if method is 'nelder-mead':
+            # default: xatol': 0.0001, 'fatol': 0.0001,
+            options = {'maxiter': maxiter, 'disp': disp, 'xatol': 1.e-8,'fatol': 1.e-8}
+        elif method is 'powell':
+            # default: 'xtol': 0.0001, 'ftol': 0.0001
+            options = {'maxiter': maxiter, 'disp': disp, 'xtol': 1.e-8,'ftol': 1.e-8}
+            
+    # solve
+    #res = minimize(func, x0, args=(W,), method=method, options=options)
+    res = minimize(func, x0, method=method, options=options)
 
+    # rerun if fails after 1000 iterations
     if not res.success:
         print('No convergence, try with 1000 more iterations')
-        res = minimize(func, res.x, args=(W,), method='nelder-mead', options={'maxiter': 1000, 'disp': disp})
+        res = minimize(func, res.x, method=method, options=options)
         if not res.success:
             print('Still no convergence')            
             print(res)
         #print(res['message'])
         
     # extract the solution
-    x = res.x[0]
-    y = res.x[1]
-    dt = res.x[2]
+    x = res.x[0]*xy_sc
+    y = res.x[1]*xy_sc
+    if clock_drift:
+        dt = res.x[2]*dt_sc
+    else:
+        dt = r.dt   
     success = res.success
     message = res.message
     
