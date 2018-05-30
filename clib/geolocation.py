@@ -11,7 +11,7 @@ warnings.filterwarnings(action='ignore')
 # class for sources
 class source(object):
     ''' A source object '''
-    def __init__(self, x_s, y_s, e_dx=10., e_c=10., c_b=1500., label=''):
+    def __init__(self, x_s, y_s, e_dx=10., e_c=10., c_b=1500., label='', t_e=0.):
         '''
         Parameters
         ----------
@@ -28,6 +28,8 @@ class source(object):
         self.c_b = c_b
         self.e_c = e_c
         self.draw_celerity(e_c, c_b=c_b)
+        #
+        self.t_e = t_e
         #
         #self.tau_i=None
         self.label = ('source ' + label).strip()
@@ -94,9 +96,188 @@ class receiver(object):
         self.dt = np.random.randn(Np)*e_dt
 
 
+# class for space-time mapping and error
+class xtmap(object):
+    ''' Mapping between distance and time with associated errors
+    This mapping can be linear, i.e. determined by a constant value of sound velocity (c_b)
+    It may be also provided by a Bellhop simulation output (not implemented)
+    Errors on this mapping are required.
+    
+    Parameters
+    ----------
+    c_b: float
+        Sound speed velocity
+    e_c: float
+        Error on our sound speed velocity
+        
+    '''
+    def __init__(self, c_b=None, e_c=None, e_min=0.):
+        if c_b is not None:
+            self.c_b = c_b
+            self._map = lambda x: x/self.c_b
+        #
+        self.e_min = e_min
+        #
+        self.e_c = e_c
+        if e_c is not None:
+            # t = x/(c+e)
+            self._emap = lambda x: np.maximum(self.e_min, x*self.e_c/self.c_b**2)
+        
+    def t(self, x):
+        ''' Returns time of propagation given a range x
+        '''
+        return self._map(x)
+    
+    def draw_t(self, x, Np=1):
+        ''' Draws a random value of propagation time 
+        '''
+        if Np == 1 :
+            return self._map(x) + np.random.randn(x.size)*self._emap(x)
+        else:
+            return self._map(x) + np.random.randn(x.size, Np)*self._emap(x)
+    
+    def e_tp(self, x):
+        ''' Returns, for a given range x, the error on propagation time
+        '''
+        return self._emap(x)
+        
+
+# utils
 def dist(a,b):
     return np.sqrt((a['x']-b['x'])**2+(a['y']-b['y'])**2)
 
+def dist_xyb(x,y,b):
+    return np.sqrt((x-b['x'])**2+(y-b['y'])**2)
+    
+
+
+#----------------------------------------------------------------------------------------------------
+
+#def plot_J(func, x, ):
+
+
+def geolocalize_xtmap(r, sources, pmap, x0=None, clock_drift=True,
+                      method='nelder-mead', options=None, disp=False):
+    ''' Find the location of a receiver
+    
+    Parameters:
+    -----------
+    ...
+    
+    '''
+
+    # source float position (known)
+    x_s = np.array([s.x_s for s in sources])
+    y_s = np.array([s.y_s for s in sources])
+    # emission time
+    t_e = np.array([s.t_e for s in sources])
+
+    # a priori float position
+    if x0 is None:
+        if clock_drift:
+            x0 = np.zeros((3))
+        else:
+            x0 = np.zeros((2))
+        #x0[0] = 1.e3
+    else:
+        if not clock_drift:
+            x0 = x0[:2]
+    x_r0 = x0[0]
+    y_r0 = x0[0]
+    
+    Ns = len(sources)
+
+    # weights
+    if clock_drift:
+        W = [1./np.array(r.e_x**2),
+             1./np.array(r.e_dt**2),
+             1./np.array([pmap.e_tp(dist_xyb(x_r0, y_r0, s))**2 for s in sources])]
+    else:
+        W = [1./np.array(r.e_x**2),
+             1./np.array([pmap.e_tp(dist_xyb(x_r0, y_r0, s))**2 for s in sources])]
+        
+    #print(W)
+        
+    # scaling factor
+    #xy_sc = np.maximum(np.abs(x0[0]), np.abs(x0[1]))
+    #xy_sc = np.maximum(r.e_x,xy_sc)
+    xy_sc = 1.e3 # should find a better rationale and parametrized expression for this
+    if clock_drift:
+        dt_sc = np.maximum( r.e_dt, np.abs(x0[2]))
+        x_sc = np.array([xy_sc, xy_sc, dt_sc])
+    else:
+        x_sc = np.array([xy_sc, xy_sc])
+    #print(x_sc)
+    #print(xy_sc)
+    #print(dt_sc)
+
+    # normalize x0
+    x0 = x0/x_sc
+    #print(x0)
+    
+    def func(x):
+        #
+        dx0 = (x[0]-x0[0])*xy_sc
+        dy0 = (x[1]-x0[1])*xy_sc
+        #
+        if clock_drift:
+            dt = x[2]*dt_sc
+            dt0 = x0[2]*dt_sc  # background value            
+        else:
+            dt = r.dt
+            dt0 = r.dt
+        #
+        dx_s = x[0]*xy_sc-x_s
+        dy_s = x[1]*xy_sc-y_s
+        #
+        _d = np.sqrt( dx_s**2 + dy_s**2 )
+        _t = (r.t_r_tilda - dt - t_e) # propagation time
+        #
+        J = ( dx0**2 + dy0**2 ) *W[0]
+        if clock_drift:
+            J += (dt-dt0**2)**2 *W[1]
+            J += np.mean( (_t - pmap.t(_d))**2 *W[2] )
+        else:
+            J += np.mean( (_t - pmap.t(_d))**2 *W[1] )
+        return J
+        
+    # no jacobian, 'nelder-mead' or 'powell'
+    if method is None:
+        method = 'nelder-mead'
+        method = 'powell'
+    if options is None:
+        maxiter = 1000
+        if method is 'nelder-mead':
+            # default: xatol': 0.0001, 'fatol': 0.0001,
+            options = {'maxiter': maxiter, 'disp': disp, 'xatol': 1.e-8,'fatol': 1.e-8}
+        elif method is 'powell':
+            # default: 'xtol': 0.0001, 'ftol': 0.0001
+            options = {'maxiter': maxiter, 'disp': disp, 'xtol': 1.e-8,'ftol': 1.e-8}
+            
+    # solve
+    #res = minimize(func, x0, args=(W,), method=method, options=options)
+    res = minimize(func, x0, method=method, options=options)
+
+    # rerun if fails after 1000 iterations
+    if not res.success:
+        print('No convergence, try with 1000 more iterations')
+        res = minimize(func, res.x, method=method, options=options)
+        if not res.success:
+            print('Still no convergence')            
+            print(res)
+        #print(res['message'])
+        
+    # extract the solution
+    x = res.x[0]*xy_sc
+    y = res.x[1]*xy_sc
+    if clock_drift:
+        dt = res.x[2]*dt_sc
+    else:
+        dt = r.dt   
+    success = res.success
+    message = res.message
+    
+    return x, y, dt, success, message, res 
 
 
 #----------------------------------------------------------------------------------------------------
