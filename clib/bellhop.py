@@ -475,9 +475,9 @@ class bellhop(object):
         plt.ylim(ymin=0)
         plt.xlabel('Time (s)')
         plt.ylabel('Amplitude')
-        plt.title('Source depth : %.1fm -- Receiver depth : %.1fm -- Receiver range : %.1fkm' \
-                  % (Pos['s']['depth'][isd], Pos['r']['depth'][ird], Pos['r']['range'][irr]/1000.))
-        
+        #plt.title('Source depth : %.1fm -- Receiver depth : %.1fm -- Receiver range : %.1fkm' \
+        #          % (Pos['s']['depth'][isd], Pos['r']['depth'][ird], Pos['r']['range'][irr]/1000.))
+        plt.title('Depth : %.1fm -- Range : %.1fkm' %(Pos['r']['depth'][ird], Pos['r']['range'][irr]/1000.))
  
     
     
@@ -1002,7 +1002,7 @@ class bellhop(object):
             plt.title('celerity profile : '+self.params['name'])
             plt.xlabel('celerity (m/s)')
             plt.ylabel('depth (m)')
-            plt.grid()
+            
 
 
     
