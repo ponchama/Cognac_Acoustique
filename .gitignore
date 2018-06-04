@@ -47,3 +47,12 @@ __pycache__/
 
 # logins
 *.login
+
+# dask files
+daskf.pbs
+dask-worker*
+dask-scheduler*
+jlab.pbs.o*
+*.log
+*.nodefile
+
