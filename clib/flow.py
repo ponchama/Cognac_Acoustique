@@ -238,6 +238,69 @@ def interp2z(z0, z, v, extrap=False):
     return vi
 
 
+
+#--------------------------------------------------------------------------------------------
+
+# conmpute the offset between ds.time and lds.ocean_time
+
+def parse_simulation(simulation):
+    s = simulation.split(' ')
+    simul=s[0]
+    domain=s[1]
+    time0=int(s[2])
+    #ncname=files(self.simul, time=self.time0)
+    return simul, domain, time0
+
+def find_dt(lds, ds, ofiles):
+    # find initial avg file
+    simul, domain, time0 = parse_simulation(lds.simulation)
+    f_match = [f for f in ofiles if '%05d'%time0 in f]
+    assert len(f_match)==1
+    t0_avg = xr.open_dataset(f_match[0]).time[0].values
+    t0_particles = lds.ocean_time[0].values
+    dt = t0_avg - t0_particles
+    return dt
+
+def get_nq(l, lon, lat, time=0):
+    ''' get the index of the parcel closest to a given lon/lat
+    '''
+    dlon = 111.e3 * np.cos(np.pi/180.*lat)
+    dlat = 111.e3
+    d =  dlon**2 *(l.isel(time=time).plon - lon)**2 \
+         + dlat**2*(l.isel(time=time).plat - lat)**2 
+    return d.argmin().values
+
+def get_hextent(l, dlon=.5, dlat=.5):
+    ''' get hextent around a dataset of lagrangian trajectories
+    '''
+    return [l.plon.min().values-dlon, l.plon.max().values+dlon, l.plat.min().values-dlat, l.plat.max().values+dlat]
+
+
+def plot_scale(ax, dl, y_offset=0., **kwargs):
+    ''' plot a scale on maps
+
+    Parameters
+    ----------
+    ax: pyplot axis handle
+    
+    dl: float
+        Reference distance in meters
+        
+    y_offset: float
+        vertical offset with respect to nominal position, in fractional unit of the window height
+        
+    '''
+    hextent = ax.get_extent()
+    dlon = 111.e3 * np.cos(np.pi/180.*(hextent[2]+hextent[3])*.5)
+    del_lat = (hextent[3]-hextent[2])
+    del_lon = (hextent[1]-hextent[0])
+    lat0 = hextent[2] + del_lat*(.9-y_offset) 
+    lon0 = hextent[0] + del_lon*.1
+    ax.plot([lon0, lon0+dl/dlon], [lat0, lat0], **kwargs)
+    ax.text(lon0+.5*dl/dlon, lat0, '%0.f km'%(dl/1.e3),
+            verticalalignment='bottom', horizontalalignment='center', **kwargs)
+    
+
 #--------------------------------------------------------------------------------------------
 def get_soundc(t, s, z, lon, lat):
     ''' compute sound velocity
