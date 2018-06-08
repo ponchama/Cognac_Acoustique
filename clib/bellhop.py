@@ -33,14 +33,14 @@ class bellhop(object):
         simu = 'simulation'
         self.params = {'name': simu, 'freq': 3000., 'hypothesis':'SVWT', \
                        'zs': 100., 'zmin': 0., 'zmax': zmax, \
-                       'rmin':0., 'rmax': rmax, 'NDepth': zmax + 1., \
-                       'NRange': rmax * 100. + 1., 'zbox': zmax + 500., 'rbox': rmax + 1.,\
+                       'rmin':0., 'rmax': rmax, 'NDepth': zmax + 1., 'zmax_receiv' : 500., \
+                       'NRange': rmax * 100. + 1., 'zbox': zmax + 10., 'rbox': rmax + 1.,\
                        'ALimites': [-90., 90.], 'NBeams' : 0, 'bottom':1600., 'file_type': 'R'}
        
         self.params.update(kwargs)
         self.params.update(NDepth = self.params['zmax'] + 1.)
         self.params.update(NRange = self.params['rmax']*100 + 1.)
-        self.params.update(zbox = self.params['zmax'] + 500.)
+        self.params.update(zbox = self.params['zmax'] + 10.)
         self.params.update(rbox = self.params['rmax'] + 1.)
         
         self.params['file_bathy'] = self.params['name']+'.bty'
@@ -283,14 +283,20 @@ class bellhop(object):
             f.write('%d / \t  !Source depth\n' % self.params['zs'])
             
             f.write('%d \t  !Number receiver depth\n' % self.params['NDepth'])
-            f.write('%.1f %.1f / \t  !Receiver depths\n' %(self.params['zmin'], self.params['zmax']))     
+            f.write('%.1f %.1f / \t  !Receiver depths\n' %(self.params['zmin'], self.params['zmax_receiv']))     
             f.write('%d \t  !Number of ranges\n' % self.params['NRange'])            
             f.write('%.1f  %.1f / \t  !Range limits\n' %(self.params['rmin'], self.params['rmax']))
                        
             f.write('\'%s\'\n' %self.params['file_type'])  # R : .ray ; IB : .shd ; A : .arr
             f.write('%d  \t  !NBeams\n'%self.params['NBeams'])      #! Bellhop calcule le nombre optimal de rayons
-            f.write('%.1f  %.1f  / \t  !Angles limites\n' %( 
-                self.params['ALimites'][0],self.params['ALimites'][1]))
+            
+            if len (self.params['ALimites']) == 2 :
+                f.write('%.1f  %.1f  / \t  !Angles limites\n' %( 
+                    self.params['ALimites'][0],self.params['ALimites'][1]))
+            else : 
+                f.write('%.9f    / \t  !Angles limites\n' %(self.params['ALimites'][0]))
+                
+              
             f.write('%.1f  %.1f  %.1f \t  !Steps zbox(m) rbox(km)\n' %(
                 0.0,self.params['zbox'],self.params['rbox']))
 
@@ -457,6 +463,7 @@ class bellhop(object):
         Narr = int(Arr['Narr'][irr, ird, isd])
 
         for i in range (Narr) : 
+    
             markerline, stemlines, baseline = plt.stem( [Arr['delay'][irr, i, ird, isd]],\
                                                [abs(Arr['A'][irr, i, ird, isd])])            
 
