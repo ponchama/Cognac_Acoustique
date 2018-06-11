@@ -277,7 +277,7 @@ class bellhop(object):
                 f.write('%.1f %.1f /\n' %(depth[i], c[i]))
             #
             f.write('\'A*\' %.1f\n' %0.0)
-            f.write('%.1f %.1f %.1f %.1f %.1f %.1f\n'%(depth_max,self.params['bottom'],10,2,0.1,0)) #gravier
+            f.write('%.1f %.1f %.1f %.1f %.1f %.1f\n'%(depth_max,self.params['bottom'],0,1.8,0.5,0)) #gravier
             #
             f.write('%d \t  !NSD\n' %1)
             f.write('%d / \t  !Source depth\n' % self.params['zs'])
@@ -725,6 +725,8 @@ class bellhop(object):
         NumTopBnc = np.zeros( (Nsz, Nalpha) )   # number of surface bounces
         NumBotBnc = np.zeros( (Nsz, Nalpha) )   # number of bottom bounces
         Dist      = np.zeros( (Nsz, Nalpha) )   # traveled distance
+        R        = np.zeros( (Nsz, Nalpha, 3500) ) 
+        Z        = np.zeros( (Nsz, Nalpha, 3500) ) 
 
         for isz in range(Nsz):
             for ibeam in range(Nalpha):
@@ -754,6 +756,8 @@ class bellhop(object):
                     for i in range (len(r)-1):
                         d += np.sqrt((r[i+1]-r[i])**2 + (z[i+1]-z[i])**2) 
                     
+                    R[isz, ibeam, :nsteps] = r 
+                    Z[isz, ibeam, :nsteps] = z 
                     
                     if plot : 
                         ## Color of the ray
@@ -788,6 +792,8 @@ class bellhop(object):
                     NumTopBnc[isz,ibeam] = np.NaN
                     NumBotBnc[isz,ibeam] = np.NaN
                     Dist[isz,ibeam]      = np.NaN
+                    R[isz, ibeam, :]     = np.NaN 
+                    Z[isz, ibeam, :]     = np.NaN
                     
         if plot : 
             plt.title(filename[:-4])
@@ -801,7 +807,7 @@ class bellhop(object):
 
 
         dictE = {'SrcAngle':SrcAngle[~np.isnan(SrcAngle)], 'NumTopBnc': NumTopBnc[~np.isnan(NumTopBnc)], \
-                 'NumBotBnc':NumBotBnc[~np.isnan(NumBotBnc)], 'Dist' : Dist[~np.isnan(Dist)]}    
+                 'NumBotBnc':NumBotBnc[~np.isnan(NumBotBnc)], 'Dist' : Dist[~np.isnan(Dist)], 'R' : R, 'Z':Z}    
         fid.close()
 
         return dictE    
