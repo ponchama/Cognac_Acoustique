@@ -725,8 +725,8 @@ class bellhop(object):
         NumTopBnc = np.zeros( (Nsz, Nalpha) )   # number of surface bounces
         NumBotBnc = np.zeros( (Nsz, Nalpha) )   # number of bottom bounces
         Dist      = np.zeros( (Nsz, Nalpha) )   # traveled distance
-        R        = np.zeros( (Nsz, Nalpha, 3500) ) 
-        Z        = np.zeros( (Nsz, Nalpha, 3500) ) 
+        R        = np.zeros( (Nsz, Nalpha, 4000) ) 
+        Z        = np.zeros( (Nsz, Nalpha, 4000) ) 
 
         for isz in range(Nsz):
             for ibeam in range(Nalpha):
