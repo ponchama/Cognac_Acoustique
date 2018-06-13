@@ -40,7 +40,7 @@ __pycache__/
 *.wav
 
 # openoffice
-*.odp#
+*.odp
 
 # jupyter
 .ipynb*
