@@ -989,7 +989,7 @@ class bellhop(object):
 
         if zoom : 
         
-            plt.figure(figsize=(10,3))
+            plt.figure(figsize=(10,4))
 
             plt.subplot(1,2,1)
             plt.plot(c, depth)
