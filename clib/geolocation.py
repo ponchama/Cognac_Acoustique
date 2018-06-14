@@ -122,6 +122,8 @@ class xtmap(object):
         if e_c is not None:
             # t = x/(c+e)
             self._emap = lambda x: np.maximum(self.e_min, x*self.e_c/self.c_b**2)
+            #self._emap = e_min
+            
         
     def t(self, x):
         ''' Returns time of propagation given a range x
@@ -148,7 +150,10 @@ def dist(a,b):
 
 def dist_xyb(x,y,b):
     return np.sqrt((x-b['x'])**2+(y-b['y'])**2)
-    
+
+
+
+
 
 
 #----------------------------------------------------------------------------------------------------
