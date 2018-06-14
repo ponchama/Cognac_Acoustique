@@ -115,14 +115,14 @@ class xtmap(object):
     def __init__(self, c_b=None, e_c=None, e_min=0.):
         if c_b is not None:
             self.c_b = c_b
-            self._map = lambda x: x/self.c_b
+            self._map = lambda x: abs(x)/self.c_b
         #
         self.e_min = e_min
         #
         self.e_c = e_c
         if e_c is not None:
             # t = x/(c+e)
-            self._emap = lambda x: np.maximum(self.e_min, x*self.e_c/self.c_b**2)
+            self._emap = lambda x: np.maximum(self.e_min, abs(x)*self.e_c/self.c_b**2)
             #self._emap = e_min
             
         
@@ -226,6 +226,7 @@ def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True,
 
     # normalize x0
     x0 = x0/x_sc
+   
     
     print('new x0 : ', x0)
     
@@ -244,14 +245,25 @@ def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True,
         #
         _d = dx_s   #np.sqrt( dx_s**2 + dy_s**2 )
         _t = (r.t_r_tilda - dt - t_e) # propagation time
+        
+        #print('d:', _d)
+        #print('t :', _t)
+        #print((_t - pmap.t(_d))**2 *W[1])
+        
         #
         J = ( dx0**2 ) *W[0]
         if clock_drift:
             J += (dt-dt0**2)**2 *W[1]
             J += np.mean( (_t - pmap.t(_d))**2 *W[2] )
         else:
-            J += np.mean( (_t - pmap.t(_d))**2 *W[1] )
+            #J += np.mean( (_t - pmap.t(_d))**2 *W[1] )
+            J = ((_t - pmap.t(_d))**2 *W[1])[1]
+            pass
         return J
+    
+    x_grd = np.linspace(-10., 10., 100.)
+    f_grd = np.array([func(np.array([lx])) for lx in x_grd])
+    plt.plot(x_grd,f_grd)
         
     # no jacobian, 'nelder-mead' or 'powell'
     if method is None:

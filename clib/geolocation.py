@@ -114,14 +114,14 @@ class xtmap(object):
     def __init__(self, c_b=None, e_c=None, e_min=0.):
         if c_b is not None:
             self.c_b = c_b
-            self._map = lambda x: x/self.c_b
+            self._map = lambda x: abs(x)/self.c_b
         #
         self.e_min = e_min
         #
         self.e_c = e_c
         if e_c is not None:
             # t = x/(c+e)
-            self._emap = lambda x: np.maximum(self.e_min, x*self.e_c/self.c_b**2)
+            self._emap = lambda x: np.maximum(self.e_min, abs(x)*self.e_c/self.c_b**2)
             #self._emap = e_min
             
         
