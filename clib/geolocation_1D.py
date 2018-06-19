@@ -170,12 +170,10 @@ def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True,
 
     # source float position (known)
     x_s = np.array([s.x_s for s in sources])
-    print('x_s : ', x_s)
     y_s = np.array([s.y_s for s in sources])
-    print('y_s : ', y_s)
     # emission time
     t_e = np.array([s.t_e for s in sources])
-    print('t_e : ', t_e)
+
     
     
     # a priori float position
@@ -188,9 +186,7 @@ def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True,
     else:
         if not clock_drift:
             x0 = x0[:1]
-    
-    print('x0 :' , x0)
-    
+   
     
     x_r0 = x0[0]  # position à priori du récepteur
     y_r0 = 0.
@@ -206,7 +202,6 @@ def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True,
         W = [1./np.array(r.e_x**2),
              1./np.array([pmap.e_tp(dist_xyb(x_r0, y_r0, s))**2 for s in sources])]
         
-    print('W : ', W)
         
     # scaling factor
     #xy_sc = np.maximum(np.abs(x0[0]), np.abs(x0[1]))
@@ -220,15 +215,13 @@ def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True,
         x_sc = np.array([xy_sc])
         
       
-    print('x_sc : ', x_sc)
+    #print('x_sc : ', x_sc)
     #print('xy_sc : ', xy_sc)
     #print(dt_sc)
 
     # normalize x0
     x0 = x0/x_sc
    
-    
-    print('new x0 : ', x0)
     
     def func(x):
         #
@@ -256,12 +249,12 @@ def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True,
             J += (dt-dt0**2)**2 *W[1]
             J += np.mean( (_t - pmap.t(_d))**2 *W[2] )
         else:
-            #J += np.mean( (_t - pmap.t(_d))**2 *W[1] )
-            J = ((_t - pmap.t(_d))**2 *W[1])[1]
+            J += np.mean( (_t - pmap.t(_d))**2 *W[1] )
+            #J = ((_t - pmap.t(_d))**2 *W[1])[1]
             pass
         return J
     
-    x_grd = np.linspace(-10., 10., 100.)
+    x_grd = np.linspace(-50., 50., 100.)
     f_grd = np.array([func(np.array([lx])) for lx in x_grd])
     plt.plot(x_grd,f_grd)
         
