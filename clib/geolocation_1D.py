@@ -112,7 +112,7 @@ class xtmap(object):
         Error on our sound speed velocity
         
     '''
-    def __init__(self, c_b=None, e_c=None, e_min=0.):
+    def __init__(self, c_b=None, e_c=None, e_t=None, e_min=1.e-3):
         if c_b is not None:
             self.c_b = c_b
             self._map = lambda x: abs(x)/self.c_b
@@ -120,11 +120,16 @@ class xtmap(object):
         self.e_min = e_min
         #
         self.e_c = e_c
-        if e_c is not None:
-            # t = x/(c+e)
-            self._emap = lambda x: np.maximum(self.e_min, abs(x)*self.e_c/self.c_b**2)
-            #self._emap = e_min
-            
+        #if e_c is not None:
+        #    self._emap = lambda x: np.maximum(self.e_min, abs(x)*self.e_c/self.c_b**2)
+
+        self.e_t = e_t
+        if e_t is not None : 
+            #self._emap = e_t
+            self._emap = lambda x: np.maximum(self.e_min, self.e_t)
+        else : 
+            self._emap = lambda x: self.e_min
+        
         
     def t(self, x):
         ''' Returns time of propagation given a range x
@@ -158,7 +163,7 @@ def dist_xyb(x,y,b):
 #----------------------------------------------------------------------------------------------------
 
 
-def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True,
+def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True, plot_min=False, 
                       method='nelder-mead', options=None, disp=False):
     ''' Find the location of a receiver
     
@@ -254,9 +259,14 @@ def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True,
             pass
         return J
     
-    x_grd = np.linspace(-50., 50., 100.)
-    f_grd = np.array([func(np.array([lx])) for lx in x_grd])
-    plt.plot(x_grd,f_grd)
+    if plot_min : 
+        x_grd = np.linspace(-50., 50., 100.)
+        f_grd = np.array([func(np.array([lx])) for lx in x_grd])
+        plt.plot(x_grd,f_grd)
+        plt.title('Fonction de minimisation')
+        plt.xlabel('x (km)')
+        plt.grid()
+
         
     # no jacobian, 'nelder-mead' or 'powell'
     if method is None:
