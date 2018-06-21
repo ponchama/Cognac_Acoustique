@@ -30,6 +30,8 @@ __pycache__/
 *.nc
 *.npy
 *.pickle
+*.txt
+*.m
 
 # fig and movies
 *.png
