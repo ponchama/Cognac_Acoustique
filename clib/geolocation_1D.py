@@ -71,7 +71,7 @@ class source(object):
 # class for receivers:
 class receiver(object):
     ''' A receiver object '''
-    def __init__(self, x, y=0., e_x=10.e3, e_dt=1., label='receiver'):
+    def __init__(self, x, y=0., e_x=10.e3, e_dt=0.1, label='receiver'):
         '''
         Parameters
         ----------
@@ -242,6 +242,10 @@ def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True, plot_min=F
         dx_s = x[0]*xy_sc-x_s
         #
         _d = dx_s   #np.sqrt( dx_s**2 + dy_s**2 )
+        
+        #print('dt : ', dt)
+        #print('t_e : ', t_e)
+        #print('r.t_r_tilda : ', r.t_r_tilda)
         _t = (r.t_r_tilda - dt - t_e) # propagation time
         
         #print('d:', _d)
