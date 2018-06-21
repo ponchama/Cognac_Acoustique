@@ -75,14 +75,21 @@ class bellhop(object):
 
    
             
-    def compute_SSP_from_flow(self, file=None, datadir=None, hgrid_file=None, \
+    def compute_SSP_from_flow(self, file=None, data_dir=None, data_files=None, \
+                              hgrid_file=None, vgrid_file=None, \
                               lon=None, lat=None, i_eta=None, i_xi=None, L=None, \
                               itime=0, plot_map=False, contour=True, **kwargs):
         # load grid info
-        grd = grid(datadir=datadir, hgrid_file=hgrid_file)
+        gkwargs = {'hgrid_file': hgrid_file, 'vgrid_file': vgrid_file}
+        if data_dir is not None:
+            gkwargs['data_dir'] = data_dir
+        grd = grid(**gkwargs)
         
         # output file
-        ofiles = sorted(glob(grd._datadir+'*.*.nc'))
+        if data_files is not None:
+            ofiles = sorted(glob(data_files))
+        else:
+            ofiles = sorted(glob(grd._data_dir+'*.*.nc'))
         if file is None:
             file = ofiles[0]
             print('Uses the following output file: %s' %file)

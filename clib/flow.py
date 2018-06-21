@@ -26,14 +26,15 @@ def minmax(x,xname):
 class grid(object):
     
     
-    def __init__(self, datadir='/home/datawork-lops-osi/jgula/NESED/', hgrid_file=None, verbose=1):
+    def __init__(self, data_dir='/home/datawork-lops-osi/jgula/NESED/', 
+                 hgrid_file=None, vgrid_file=None, verbose=1):
         
         self._verbose = verbose
         
-        self._datadir = datadir
+        self._data_dir = data_dir
         
         self._load_hgrid(hgrid_file=hgrid_file)
-        self._load_vgrid()
+        self._load_vgrid(vgrid_file)
         
         self.__str__()
 
@@ -109,9 +110,9 @@ class grid(object):
         '''
         if hgrid_file is None:
             # search for files
-            hgrid_file = glob(self._datadir+'*grd.nc')
+            hgrid_file = glob(self._data_dir+'*grd.nc')
             if len(hgrid_file)==0:
-                print('No grid file found in'+self._datadir)
+                print('No grid file found in'+self._data_dir)
                 sys.exit()
             else:
                 if self._verbose > 0 : 
@@ -138,27 +139,33 @@ class grid(object):
         self.Leta = (1./self._ds['pn'][:,0]).sum()
 
 
-    def _load_vgrid(self):
+    def _load_vgrid(self, vgrid_file):
         ''' load vertical grid variables
         '''
-        # search for files with 
-        files = glob(self._datadir+'*.nc')
-        if len(files)==0:
-            print('No nc file found in'+self._datadir)
-            sys.exit()
-        for lfile in files:
+        # search for files with
+        if vgrid_file is None:
+            files = glob(self._data_dir+'*.nc')
+            if len(files)==0:
+                print('No nc file found in'+self._data_dir)
+                sys.exit()
+            for lfile in files:
+                ds = xr.open_dataset(lfile)
+                if 'sc_w' in ds.attrs:
+                    if self._verbose > 1:
+                        print('vertical grid parameters found in %s'%(lfile))
+                    break
+                else:
+                    ds.close()
+                    lfile = files[0]
+        else:
+            lfile = vgrid_file
             ds = xr.open_dataset(lfile)
-            ds.coords['s_rho'] = ds.attrs['sc_r']
-            ds.coords['s_w'] = ds.attrs['sc_w']
-            ds['Cs_w'] = xr.DataArray(ds.attrs['Cs_w'], coords=[ds['s_w']])
-            ds['Cs_r'] = xr.DataArray(ds.attrs['Cs_r'], coords=[ds['s_rho']])
-            #print(ds)
-            if 'sc_w' in ds.attrs:
-                if self._verbose > 1:
-                    print('vertical grid parameters found in %s'%(lfile))
-                break
-            else:
-                ds.close()
+        #
+        ds.coords['s_rho'] = ds.attrs['sc_r']
+        ds.coords['s_w'] = ds.attrs['sc_w']
+        ds['Cs_w'] = xr.DataArray(ds.attrs['Cs_w'], coords=[ds['s_w']])
+        ds['Cs_r'] = xr.DataArray(ds.attrs['Cs_r'], coords=[ds['s_rho']])
+
         self.hc = ds.attrs['hc']
         #self.sc_w = ds.attrs['sc_w']
         #self.Cs_w = ds.attrs['Cs_w']
