@@ -92,12 +92,17 @@ class bellhop(object):
             ofiles = sorted(glob(grd._data_dir+'*.*.nc'))
         if file is None:
             file = ofiles[0]
-            print('Uses the following output file: %s' %file)
+        elif type(file) is int : 
+            file = ofiles[file]
+        print('Uses the following output file: %s' %file)
     
         # load T/S
         #T = Dataset(file)['temp']
         #S = Dataset(file)['salt']
-        ds = xr.open_dataset(file, chunks = {'s_rho': 1}).isel(time=itime)
+        ds = xr.open_dataset(file, chunks = {'s_rho': 1})
+        #print(ds)
+        ds = ds.isel(time=itime)
+        print('Uses the following time : %d' %itime)
         #ds['lon_rho'] = (('eta_rho', 'xi_rho'), grd.lon_rho)
         #ds['lat_rho'] = (('eta_rho', 'xi_rho'), grd.lat_rho)
         
