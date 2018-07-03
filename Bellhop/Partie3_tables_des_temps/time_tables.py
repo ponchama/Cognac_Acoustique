@@ -4,8 +4,8 @@ import sys
 import subprocess
 
 
-n_file = sys.argv[1]    #file number
-times = [0, 10, 20]     #chosen times 
+n_file = int(sys.argv[1])    #file number
+times = [0, 11]     #chosen times 
 for i in range(len(times)) : 
     s = bellhop({'gs': {'datadir': '/home/datawork-lops-osi/jgula/NESED/', 'file':n_file, 'itime':times[i], 
                         'lon': [-66.6,-65.4], 'lat': [36.,36.], 'plot_map': True, 'contour':True}}, zmax = 4900)
@@ -36,7 +36,8 @@ for i in range(len(times)) :
     #### FULL SIMULATION 
     file_name = str(n_file)+'_time%d'%times[i]
     s.generate_envfile('gs',file_env = file_name+'.env', Issp=issp, SSP_depth_step=1)
-    s.generate_sspfile('gs', file_env=file_name+'.env', SSP_depth_step=1)
+    s.generate_sspfile('gs', file_env = file_name+'.env', SSP_depth_step=1)
+    s.generate_btyfile(file_env = file_name+'.env', bathy=4500.)
     #Arrivals calculations .arr
     subprocess.call(["bellhop.exe", file_name])
                 
@@ -46,6 +47,7 @@ for i in range(len(times)) :
     r_3profiles = np.array([r[0], r[100], r[215]]) 
     s.generate_envfile('gs',file_env = file_name+'_50km.env', Issp=issp, SSP_depth_step=1, c = c_3profiles[0,:])
     s.generate_sspfile('gs', file_env = file_name+'_50km.env', SSP_depth_step=1, r = r_3profiles, c = c_3profiles)
+    s.generate_btyfile(file_env = file_name+'_50km.env', bathy=4500.)
     subprocess.call(["bellhop.exe", file_name+'_50km'])
 
     
@@ -56,6 +58,7 @@ for i in range(len(times)) :
                              r[180], r[200], r[215]]) 
     s.generate_envfile('gs',file_env = file_name+'_10km.env', Issp=issp, SSP_depth_step=1, c = c_12profiles[0,:])
     s.generate_sspfile('gs', file_env = file_name+'_10km.env', SSP_depth_step=1, r = r_12profiles, c = c_12profiles)
+    s.generate_btyfile(file_env = file_name+'_10km.env', bathy=4500.)
     subprocess.call(["bellhop.exe", file_name+'_10km'])
     
     
