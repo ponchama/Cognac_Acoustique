@@ -245,8 +245,36 @@ class bellhop(object):
         else : 
             return c_s, -z_uni, s, lon_s, lat_s, h_s, sal_s, temp_s #S_uni, T_uni 
             
+            
 
-          
+    def generate_btyfile(self, file_env=None, bathy=4500.):
+        ''' 
+        Parameters
+        ----------
+        file_env : str
+            Name of the corresponding .env file
+        bathy : float
+            Depth used to construct constant bathymetry
+        '''
+        # name of the environnement file
+        if file_env is None:
+            file_env = self.params['file_env']
+            
+        # name of bty file
+        file_bty = file_env[:-4]+'.bty'
+            
+            
+        # Ranges 
+        R = [0.0, 25.0, 50.0, 75.0, 100.0, 125.0]
+            
+        # Create environment file
+        with open(file_bty, 'w') as f:
+            f.write('\'L\'\n')
+            f.write('%d\n' %len(R))
+            for i in range (len(R)) : 
+                f.write('%.1f %.1f \n' %(R[i], bathy))
+               
+      
         
         
     def generate_envfile(self, ssp_key, Issp=0, file_env=None, SSP_depth_step=1, c=None):
@@ -310,7 +338,7 @@ class bellhop(object):
                 
               
             f.write('%.1f  %.1f  %.1f \t  !Steps zbox(m) rbox(km)\n' %(
-                0.0,self.params['zbox'],self.params['rbox']))
+                10.0,self.params['zbox'],self.params['rbox']))
 
         
     
@@ -333,7 +361,7 @@ class bellhop(object):
             
         # name of ssp file
         file_ssp = file_env[:-4]+'.ssp'
-        print('Output file is : '+file_ssp)
+        print('Output file is : '+file_ssp[:-4])
             
         # load sound speed profile
         if r is None : 
