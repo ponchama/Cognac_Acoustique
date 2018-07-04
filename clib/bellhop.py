@@ -406,8 +406,8 @@ class bellhop(object):
         if filename is None :
             filename = self.params['name']+'.arr'
             
-        file = Path("./%s" %filename)
-        if not file.is_file():
+        #file = Path("./%s" %filename)
+        if not os.path.isfile(filename):
             print("Le fichier %s n'exite pas dans ce répertoire." %filename)
             return
         
