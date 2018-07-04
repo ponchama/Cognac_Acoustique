@@ -3,6 +3,10 @@ import numpy as np
 import sys
 import subprocess
 
+import matplotlib.pyplot as plt
+plt.switch_backend('agg')
+
+bellhop_exe = "/home1/datahome/aponte/at/Bellhop/bellhop.exe"
 
 n_file = int(sys.argv[1])    #file number
 times = [0, 11]     #chosen times 
@@ -39,8 +43,8 @@ for i in range(len(times)) :
     s.generate_sspfile('gs', file_env = file_name+'.env', SSP_depth_step=1)
     s.generate_btyfile(file_env = file_name+'.env', bathy=4500.)
     #Arrivals calculations .arr
-    subprocess.call(["bellhop.exe", file_name])
-                
+    subprocess.call([bellhop_exe, file_name])
+ 
     ### ONE PROFILE EVERY 50km
     # ranges 0km, 53km and 107km 
     c_3profiles = np.vstack((c[0,:],c[107,:],c[215,:]))
@@ -48,9 +52,8 @@ for i in range(len(times)) :
     s.generate_envfile('gs',file_env = file_name+'_50km.env', Issp=issp, SSP_depth_step=1, c = c_3profiles[0,:])
     s.generate_sspfile('gs', file_env = file_name+'_50km.env', SSP_depth_step=1, r = r_3profiles, c = c_3profiles)
     s.generate_btyfile(file_env = file_name+'_50km.env', bathy=4500.)
-    subprocess.call(["bellhop.exe", file_name+'_50km'])
+    subprocess.call([bellhop_exe, file_name+'_50km'])
 
-    
     ### ONE PROFILE EVERY 10km
     c_12profiles = np.vstack((c[0,:],c[20,:],c[40,:],c[60,:],c[80,:],c[100,:], c[120,:], c[140,:], \
                               c[160,:], c[180,:], c[200,:], c[215,:]))
@@ -59,7 +62,7 @@ for i in range(len(times)) :
     s.generate_envfile('gs',file_env = file_name+'_10km.env', Issp=issp, SSP_depth_step=1, c = c_12profiles[0,:])
     s.generate_sspfile('gs', file_env = file_name+'_10km.env', SSP_depth_step=1, r = r_12profiles, c = c_12profiles)
     s.generate_btyfile(file_env = file_name+'_10km.env', bathy=4500.)
-    subprocess.call(["bellhop.exe", file_name+'_10km'])
+    subprocess.call([bellhop_exe, file_name+'_10km'])
     
     
     
