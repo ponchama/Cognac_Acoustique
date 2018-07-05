@@ -1060,7 +1060,7 @@ class bellhop(object):
 
     
     
-    def plotssp2D (self, filename=None, subplot = False, zoom = None):
+    def plotssp2D (self, filename=None, plot=True, subplot = False, zoom = None):
         '''
         Parameters
         ----------
@@ -1071,12 +1071,13 @@ class bellhop(object):
         if filename is None :           
             filename = self.params['file_ssp']
             
-        file = Path("./%s" %filename)
-        if not file.is_file():
+
+        if not os.path.isfile(filename):
             print("Le fichier %s n'exite pas dans ce répertoire." %filename)
             return
-          
-
+        
+        
+        
         ### read file ssp
         fid = open(filename,'r')
         
@@ -1104,45 +1105,46 @@ class bellhop(object):
 
         fid.close()
 
-        
+        if plot : 
         ### plot ssp2D 
-        if subplot : 
-            plt.figure(figsize=(17,8))
-            for i in range(NProf):
-                plt.subplot (1,NProf,i+1)
-                plt.plot(cmat[:,i],depth)
+            if subplot : 
+                plt.figure(figsize=(17,8))
+                for i in range(NProf):
+                    plt.subplot (1,NProf,i+1)
+                    plt.plot(cmat[:,i],depth)
+                    plt.gca().invert_yaxis()
+                    plt.title('%d m' %rProf[i])
+
+            #plt.savefig('profiles_'+file_SSP[:-4], dpi=100)
+
+            #plt.figure(figsize=(9,6))
+
+            if zoom is None :
+                plt.pcolormesh(rProf, depth, cmat, shading='gouraud')#, cmap ='jet')
+                cbar = plt.colorbar()
+                cbar.set_label("sound speed (m/s)")
+                plt.title ("Range-dependent SSP - "+filename[:-4])
+                plt.xlabel("range (km)")
+                plt.ylabel("depth (m)")
                 plt.gca().invert_yaxis()
-                plt.title('%d m' %rProf[i])
+                plt.contour(rProf, depth,cmat,10,colors='w',linestyles='dotted')
 
-        #plt.savefig('profiles_'+file_SSP[:-4], dpi=100)
-
-        #plt.figure(figsize=(9,6))
-        
-        if zoom is None :
-            plt.pcolormesh(rProf, depth, cmat, shading='gouraud')#, cmap ='jet')
-            cbar = plt.colorbar()
-            cbar.set_label("sound speed (m/s)")
-            plt.title ("Range-dependent SSP - "+filename[:-4])
-            plt.xlabel("range (km)")
-            plt.ylabel("depth (m)")
-            plt.gca().invert_yaxis()
-            plt.contour(rProf, depth,cmat,10,colors='w',linestyles='dotted')
-
-        else : 
-            plt.pcolormesh(rProf, depth[np.where(depth <= zoom)], \
-                           cmat[np.where(depth <= zoom)], shading='gouraud')
-            cbar = plt.colorbar()
-            cbar.set_label("sound speed (m/s)")
-            plt.title ("Zoom on first %.1fm" %(zoom-50))
-            plt.xlabel("range (km)")
-            plt.ylabel("depth (m)")
-            plt.ylim([0,zoom-50])
-            plt.gca().invert_yaxis()
-            plt.contour(rProf, depth,cmat,10,colors='w',linestyles='dotted')
-
-            
+            else : 
+                plt.pcolormesh(rProf, depth[np.where(depth <= zoom)], \
+                               cmat[np.where(depth <= zoom)], shading='gouraud')
+                cbar = plt.colorbar()
+                cbar.set_label("sound speed (m/s)")
+                plt.title ("Zoom on first %.1fm" %(zoom-50))
+                plt.xlabel("range (km)")
+                plt.ylabel("depth (m)")
+                plt.ylim([0,zoom-50])
+                plt.gca().invert_yaxis()
+                plt.contour(rProf, depth,cmat,10,colors='w',linestyles='dotted')
+ 
         #plt.savefig('range-dependent SSP_'+file_SSP[:-4], dpi=100)
-
+        
+        else : 
+            return rProf, depth, cmat
         
         
 
