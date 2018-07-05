@@ -53,7 +53,7 @@ for i in range(len(times)) :
                               c[150,:], c[160,:], c[170,:], c[180,:], c[190,:], c[200,:], c[215,:]))
     
     r_22profiles = np.array([r[0], r[10], r[20], r[30], r[40], r[50], r[60], r[70], r[80], r[90], \
-                             r[100], r[110], r[120], r[130], r[140], r[1500], r[160], r[170], \
+                             r[100], r[110], r[120], r[130], r[140], r[150], r[160], r[170], \
                              r[180], r[190], r[200], r[215]]) 
     s.generate_envfile('gs',file_env = file_name+'_5km.env', Issp=issp, SSP_depth_step=1, \
                        c = c_22profiles[0,:])
