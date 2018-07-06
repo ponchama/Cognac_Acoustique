@@ -6,17 +6,19 @@ import subprocess
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 
-bellhop_exe = "/home1/datahome/aponte/at/Bellhop/bellhop.exe"
+#bellhop_exe = "/home1/datahome/aponte/at/Bellhop/bellhop.exe"
+bellhop_exe = "/home1/datawork/mponchar/cognac/bellhop.exe"
 
 n_file = int(sys.argv[1])    #file number
-times = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]     #chosen times 
+times = [0]
+#times = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]     #chosen times 
 for i in range(len(times)) : 
     
     s = bellhop({'gs': {'data_files': '/home/datawork-lops-osi/mlecorre/POLGYR/HIS/*his*.nc', \
                           'hgrid_file': '/home/datawork-lops-osi/jgula/POLGYR/polgyr_grd.nc',
                      'vgrid_file': '/home/datawork-lops-osi/mlecorre/POLGYR/HIS/polgyr_his.03960.nc',\
-                         'file':n_file, 'lon': [-20.5, -19.], 'lat': [48., 48.], 'plot_map': True, \
-                         'contour':True}},  zmax = 4900)
+                         'file':n_file, 'itime':times[i], 'lon': [-20.5, -19.], 'lat': [48., 48.], \
+                         'plot_map': True,  'contour':True}},  zmax = 4900)
     
     #SSP profiles
     r = s.SSP['gs']['s']              # range (m)
