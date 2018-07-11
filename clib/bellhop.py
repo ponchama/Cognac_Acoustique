@@ -520,11 +520,11 @@ class bellhop(object):
                 plt.setp(markerline, color = 'k')
  
         plt.ylim(ymin=0)
-        plt.xlabel('Time (s)')
-        plt.ylabel('Amplitude')
+        plt.xlabel('Time (s)', fontsize=14)
+        plt.ylabel('Amplitude', fontsize=14)
         #plt.title('Source depth : %.1fm -- Receiver depth : %.1fm -- Receiver range : %.1fkm' \
         #          % (Pos['s']['depth'][isd], Pos['r']['depth'][ird], Pos['r']['range'][irr]/1000.))
-        plt.title('Depth : %.1fm -- Range : %.1fkm' %(Pos['r']['depth'][ird], Pos['r']['range'][irr]/1000.))
+        plt.title('Depth : %.1fm -- Range : %.1fkm' %(Pos['r']['depth'][ird], Pos['r']['range'][irr]/1000.), fontsize=16)
  
     
     
@@ -977,12 +977,12 @@ class bellhop(object):
 
 
         # plot TL from 0 to 500m (ZOOM) 
-        plt.pcolormesh (rt, zt, TL, cmap='jet')
-        plt.title ('TL - ZOOM de 0 à 500m')
-        plt.xlabel("range (m)")
-        plt.ylabel("depth (m)")
+        plt.pcolormesh (rt/1000., zt, TL, cmap='jet')
+        plt.title ('TL - ZOOM de 0 à 500m', fontsize=16)
+        plt.xlabel("range (km)", fontsize=14)
+        plt.ylabel("depth (m)", fontsize=14)
         cbar = plt.colorbar()
-        cbar.set_label("TL(dB)")
+        cbar.set_label("TL(dB)", fontsize=12)
         plt.clim ([tlmin,tlmax])
         plt.ylim(ymax = 500)
         plt.gca().invert_yaxis()
