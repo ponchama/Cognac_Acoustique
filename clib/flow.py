@@ -208,6 +208,7 @@ class grid(object):
                         self['lat_rho'][-1:0:-1,-1],self['lat_rho'][0,-1:0:-1]))
         ax.plot(dlon,dlat,**kwargs)
 
+
     def plot_xz(self,ax,x,z,toplt,**kwargs):
         x = (x[:,1:]-x[:,:-1])*.5
         toplt = np.hstack((toplt,toplt[-1,:]))
@@ -306,7 +307,6 @@ def plot_scale(ax, dl, y_offset=0., **kwargs):
     ax.plot([lon0, lon0+dl/dlon], [lat0, lat0], **kwargs)
     ax.text(lon0+.5*dl/dlon, lat0, '%0.f km'%(dl/1.e3),
             verticalalignment='bottom', horizontalalignment='center', **kwargs)
-    
 
 #--------------------------------------------------------------------------------------------
 def get_soundc(t, s, z, lon, lat):
@@ -318,8 +318,9 @@ def get_soundc(t, s, z, lon, lat):
     #
     p = gsw.p_from_z(z,latm)
     SA = gsw.SA_from_SP(s, p, lonm, latm)
-    CT = gsw.CT_from_pt(SA,t)
-    c = gsw.sound_speed(s,t,p)
+    CT = gsw.CT_from_pt(SA,t+0.002)
+    c = gsw.sound_speed(SA,CT,p)
+    #c = gsw.sound_speed(s,t,p)   version used up to 16/07/2018 
     # inputs are: SA (absolute salinity) and CT (conservative temperature)
     return c
     

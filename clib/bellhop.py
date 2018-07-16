@@ -232,7 +232,9 @@ class bellhop(object):
             plt.plot(lon, lat, '*', markeredgecolor='white', markerfacecolor='cadetblue', markersize=20)
             if section:
                 plt.plot(lon, lat, '-', color='cadetblue', linewidth=2)
-            ax.set_title('surface temperature [degC]')
+                
+            ax.set_title('Surface temperature (°C)')
+            #ax.set_ylabel('longitude (°)')
            
         if contour :
             

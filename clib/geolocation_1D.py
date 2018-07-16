@@ -43,7 +43,7 @@ class source(object):
             return getattr(self, item)
     
     def plot(self):
-        plt.plot(self.x_s/1.e3, self.y_s/1.e3, color='salmon', marker='o', 
+        plt.plot(self.x_s/1.e3, self.y_s/1.e3, color='darkorange', marker='o', 
                  markersize=20, label=self.label)
         
     def draw_dxdy(self, e_dx, Np=1):
