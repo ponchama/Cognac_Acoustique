@@ -522,8 +522,8 @@ class bellhop(object):
                 plt.setp(markerline, color = 'k')
  
         plt.ylim(ymin=0)
-        plt.xlabel('Time (s)', fontsize=14)
-        plt.ylabel('Amplitude', fontsize=14)
+        plt.xlabel('temps (s)', fontsize=14)
+        plt.ylabel('amplitude', fontsize=14)
         #plt.title('Source depth : %.1fm -- Receiver depth : %.1fm -- Receiver range : %.1fkm' \
         #          % (Pos['s']['depth'][isd], Pos['r']['depth'][ird], Pos['r']['range'][irr]/1000.))
         plt.title('Depth : %.1fm -- Range : %.1fkm' %(Pos['r']['depth'][ird], Pos['r']['range'][irr]/1000.), fontsize=16)
