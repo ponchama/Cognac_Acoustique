@@ -218,8 +218,8 @@ class bellhop(object):
             #
             ax=plt.axes(projection=crs)
             ax.set_extent(grd.hextent, crs)
-            gl=ax.gridlines(crs=crs,draw_labels=True)
-            gl.xlabels_top = False
+            #gl=ax.gridlines(crs=crs,draw_labels=True)
+            #gl.xlabels_top = False
             ax.coastlines(resolution='50m')
             #
             toplt = ds['temp'].isel(s_rho=-1).values
