@@ -112,6 +112,7 @@ class xtmap(object):
         Error on our sound speed velocity
         
     '''
+
     def __init__(self, c_b=None, e_c=None, e_t=None, e_min=1.e-3):
         if c_b is not None:
             self.c_b = c_b
@@ -121,12 +122,16 @@ class xtmap(object):
         #
         self.e_c = e_c
         #if e_c is not None:
-        #    self._emap = lambda x: np.maximum(self.e_min, abs(x)*self.e_c/self.c_b**2)
-
+        #    self._emap = lambda x: np.maximum(self.e_min, abs(x)*self.e_c/self.c_b**2
+        
         self.e_t = e_t
-        if e_t is not None : 
-            #self._emap = e_t
-            self._emap = lambda x: np.maximum(self.e_min, self.e_t)
+             
+        if self.e_t is not None : 
+            if type(self.e_t) is float : 
+                #self._emap = e_t
+                self._emap = lambda x: np.maximum(self.e_min, self.e_t)
+            else : #function
+                self._emap = self.e_t
         else : 
             self._emap = lambda x: self.e_min
         
@@ -195,6 +200,7 @@ def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True, plot_min=F
     
     x_r0 = x0[0]  # position à priori du récepteur
     y_r0 = 0.
+    
 
     Ns = len(sources)
 
@@ -206,8 +212,12 @@ def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True, plot_min=F
     else:
         W = [1./np.array(r.e_x**2),
              1./np.array([pmap.e_tp(dist_xyb(x_r0, y_r0, s))**2 for s in sources])]
-        
-        
+    
+    
+    #print('distances : ', [dist_xyb(x_r0, y_r0, s) for s in sources])
+    #print('erreur en mètres  W[2] : ', 1/np.sqrt(W[2])*1500)
+    
+    
     # scaling factor
     #xy_sc = np.maximum(np.abs(x0[0]), np.abs(x0[1]))
     #xy_sc = np.maximum(r.e_x,xy_sc)
@@ -250,7 +260,6 @@ def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True, plot_min=F
         
         #print('d:', _d)
         #print('t :', _t)
-        #print((_t - pmap.t(_d))**2 *W[1])
         
         #
         J = ( dx0**2 ) *W[0]
@@ -306,6 +315,9 @@ def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True, plot_min=F
         dt = r.dt   
     success = res.success
     message = res.message
+    
+    #print('x final estimé : ', x)
+    #print('\n')
     
     return x, dt, success, message, res 
 
