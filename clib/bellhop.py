@@ -984,7 +984,7 @@ class bellhop(object):
         plt.xlabel("range (km)", fontsize=14)
         plt.ylabel("depth (m)", fontsize=14)
         cbar = plt.colorbar()
-        cbar.set_label("TL(dB)", fontsize=12)
+        cbar.set_label("TL(dB ref. 1µPa)", fontsize=12)
         plt.clim ([tlmin,tlmax])
         plt.ylim(ymax = 500)
         plt.gca().invert_yaxis()
