@@ -50,11 +50,13 @@ class source(object):
     def plot(self, t=None):
         if t is None : 
             x, y = self.x_s, self.y_s
+            lab = "t = 0h"
         else : 
             x, y = self.get_xy(t)
+            lab = "t = %.1f h" %(t/3600.)
             
         plt.plot(x/1.e3, y/1.e3, color='darkorange', marker='o', 
-                 markersize=20, label=self.label)
+                 markersize=20, label=lab)
         
     def draw_dxdy(self, e_dx, Np=1):
         ''' compute Np realizations of transductor position
@@ -142,18 +144,14 @@ class xtmap(object):
         
     '''
 
-    def __init__(self, c_b=None, e_c=None, e_t=None, e_min=1.e-3):
+    def __init__(self, c_b=None, e_c=0., e_t=None, e_min=1.e-3):
         if c_b is not None:
             self.c_b = c_b
             self._map = lambda x: abs(x)/self.c_b
         #
-        self.e_min = e_min
-        #
         self.e_c = e_c
-        #if e_c is not None:
-        #    self._emap = lambda x: np.maximum(self.e_min, abs(x)*self.e_c/self.c_b**2
-        
         self.e_t = e_t
+        self.e_min = e_min
              
         if self.e_t is not None : 
             if type(self.e_t) is float : 
