@@ -278,7 +278,6 @@ def geolocalize_xtmap_1Dv(r, sources, t_e, pmap, x0=None, clock_drift=True, plot
             J += np.mean( (_t - pmap.t(_d))**2 *W[2] )
             pass
         return J
-
     
      ##################################################################
     ################ Tracé de la fonction J ##########################
@@ -347,8 +346,9 @@ def geolocalize_xtmap_1Dv(r, sources, t_e, pmap, x0=None, clock_drift=True, plot
         dt = r.dt   
     success = res.success
     message = res.message
+    JJ = func([res.x[0],res.x[1],dt])
     
-    return x, v, dt, success, message, res 
+    return x, v, dt, success, message, res, JJ 
 
 # ---------------------------------------------------------------------------------------------
 ###############################################################################################
@@ -356,12 +356,13 @@ def geolocalize_xtmap_1Dv(r, sources, t_e, pmap, x0=None, clock_drift=True, plot
 ### Fonctions de calcul des transects 
 
 
-def simu (r, sources, Nmc, t_e, t_drift, pmap, x0=None) : 
+def simu (r, sources, Nmc, t_e, t_drift, pmap, x0=None, new_method=False) : 
     ''' It returns rms and bias on x position for one receiver position'''
     x = np.zeros(Nmc)
     v = np.zeros(Nmc)
     dt = np.zeros(Nmc)
     su = np.zeros (Nmc)
+    J = np.zeros(Nmc)
     
     for i in range(Nmc):
             
@@ -373,25 +374,26 @@ def simu (r, sources, Nmc, t_e, t_drift, pmap, x0=None) :
             _t.append(t + pmap.draw_t(rg))
 
         r.t_r_tilda = np.array(_t+r.dt).squeeze()
-        x[i], v[i], dt[i], success, message, res = geolocalize_xtmap_1Dv(r, sources, t_e, pmap, \
-                                                                         clock_drift=False, \
-                                                                        x0 = x0)    
         
-        # solve a first time
-        #r.t_r_tilda = np.array([s.t_e+pmap.draw_t(dist(s,r))+r.dt for s in sources]).squeeze()
-        #x[i], v[i], dt[i], success, message, res = geolocalize_xtmap_1Dv(r, sources, t_e, pmap, \
-        #                                                                t_e, clock_drift=t_drift)
-        # rerun with adjusted expected errors on propagation time
-        #for j in range(1):
-        #    x[i], dt[i], success, message, res = geolocalize_xtmap_1D(r, sources, pmap, \
-        #                                                                 clock_drift=t_drift, \
-        #                                                                 x0=[x[i], dt[i]])
-       
+        if not new_method : 
+            x[i], v[i], dt[i], success, message, res, J[i] = geolocalize_xtmap_1Dv(r, sources, t_e, pmap, \
+                                                                             clock_drift=False, \
+                                                                            x0 = x0)    
+        else : 
+
+            x1, v1, dt1, success1, message1, res1, J1 = geolocalize_xtmap_1Dv(r, sources, t_e, pmap, clock_drift=False, \
+                                                                     x0 = np.array([r.x,0.]))
+            x2,v2, dt2, success2, message2, res2, J2 = geolocalize_xtmap_1Dv(r, sources, t_e, pmap, clock_drift=False, \
+                                                            x0 = np.array([(sources[0].x_s - r.x) + sources[0].x_s,0.]))
+            if J1 <= J2 : 
+                x[i], v[i], dt[i], success, message, res, J[i] = x1, v1, dt1, success1, message1, res1, J1
+            else : 
+                x[i], v[i], dt[i], success, message, res, J[i] = x2, v2, dt2, success2, message2, res2, J2
+
         if success :
             su[i] = 1 
         elif message.find('iterations')!= -1 : 
             su[i] = 0
-
             
     # rms error on the receiver position
     d_rms = np.sqrt( np.mean( (x[np.where(su==1)] - r.x)**2 ) )
@@ -405,7 +407,7 @@ from ipywidgets import FloatProgress
 from IPython.display import display
 
 
-def transect (sources, X, Y, Nmc, t_e, pmap, v_x=0.1, clock_drift = False, e_dt=0.01, x0=None) :
+def transect (sources, X, Y, Nmc, t_e, pmap, v_x=0.1, clock_drift = False, e_dt=0.01, x0=None, new_method=False) :
     RMS_t = np.zeros((len(X)))
     BiasX_t = np.zeros((len(X)))
     Success_t = np.zeros((Nmc, len(X)))
@@ -424,7 +426,7 @@ def transect (sources, X, Y, Nmc, t_e, pmap, v_x=0.1, clock_drift = False, e_dt=
         r = receiver(X[i], Y, e_dt=e_dt, v_x=v_x)
         #r.dt = r_dt # unchanged variable during simulations 
         #
-        d_rms, bias_x, su = simu (r, sources, Nmc, t_e=t_e, t_drift = clock_drift, pmap=pmap, x0=x0)
+        d_rms, bias_x, su = simu (r, sources, Nmc, t_e=t_e, t_drift = clock_drift, pmap=pmap, x0=x0, new_method=new_method)
 
         RMS_t[i]       = d_rms
         BiasX_t[i]     = bias_x
