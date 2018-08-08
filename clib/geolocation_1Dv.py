@@ -1,6 +1,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from scipy.optimize import minimize
 import warnings
 warnings.filterwarnings(action='ignore')
@@ -217,7 +218,7 @@ def geolocalize_xtmap_1Dv(r, sources, t_e, pmap, x0=None, clock_drift=True, plot
             x0 = np.zeros((2))  # x, v
     else:
         if not clock_drift:
-            x0 = x0[:1]
+            x0 = x0[:2]
    
     
     x_r0 = x0[0]  # position à priori du récepteur
@@ -277,15 +278,41 @@ def geolocalize_xtmap_1Dv(r, sources, t_e, pmap, x0=None, clock_drift=True, plot
             J += np.mean( (_t - pmap.t(_d))**2 *W[2] )
             pass
         return J
+
+    
+     ##################################################################
+    ################ Tracé de la fonction J ##########################
     
     if plot_min : 
-        x_grd = np.linspace(-50., 50., 100.)
-        f_grd = np.array([func(np.array([lx])) for lx in x_grd])
-        plt.plot(x_grd,f_grd)
-        plt.title('Fonction de minimisation')
-        plt.xlabel('x (km)')
-        plt.grid()
+        #x_grd = np.linspace(-50., 50., 100.)
+        #f_grd = np.array([func(np.array([lx])) for lx in x_grd])
+        #plt.plot(x_grd,f_grd)
+        #plt.title('Fonction de minimisation')
+        #plt.xlabel('x (km)')
+        #plt.grid()
+        
+        x_grd = np.linspace(-30.e3, 30.e3, 601.) / xy_sc
+        v_grd = np.linspace(-1,6,71.) / v_sc
+        f_grd2D = np.zeros((x_grd.size, v_grd.size))
+        X, Y = np.meshgrid(x_grd, v_grd)
 
+        for i in range (len(x_grd)) : 
+            for j in range (len(v_grd)) :
+                f_grd2D[i,j] = func(np.array([x_grd[i], v_grd[j]]))
+        
+        np.save('f_grd2D', f_grd2D)
+       
+        plt.figure(figsize=(8,5))
+        plt.pcolormesh(X,Y*v_sc,f_grd2D.T)
+        plt.title("Fonction de minimisation", fontsize=16)
+        plt.xlabel('x (km)', fontsize=14)
+        plt.ylabel('v (m/s)', fontsize=14)
+        plt.colorbar()
+        plt.clim([0, 30000.])
+
+     ###############################################################
+    ###############################################################
+        
         
     # no jacobian, 'nelder-mead' or 'powell'
     if method is None:
@@ -324,4 +351,87 @@ def geolocalize_xtmap_1Dv(r, sources, t_e, pmap, x0=None, clock_drift=True, plot
     return x, v, dt, success, message, res 
 
 # ---------------------------------------------------------------------------------------------
+###############################################################################################
+
+### Fonctions de calcul des transects 
+
+
+def simu (r, sources, Nmc, t_e, t_drift, pmap, x0=None) : 
+    ''' It returns rms and bias on x position for one receiver position'''
+    x = np.zeros(Nmc)
+    v = np.zeros(Nmc)
+    dt = np.zeros(Nmc)
+    su = np.zeros (Nmc)
+    
+    for i in range(Nmc):
+            
+        _t = []
+        for t in t_e : 
+            x_r, y_r = r.get_xy(t)
+            x_s, y_s = sources[0].get_xy(t)
+            rg = np.sqrt((x_r-x_s)**2 + (y_r - y_s)**2)
+            _t.append(t + pmap.draw_t(rg))
+
+        r.t_r_tilda = np.array(_t+r.dt).squeeze()
+        x[i], v[i], dt[i], success, message, res = geolocalize_xtmap_1Dv(r, sources, t_e, pmap, \
+                                                                         clock_drift=False, \
+                                                                        x0 = x0)    
+        
+        # solve a first time
+        #r.t_r_tilda = np.array([s.t_e+pmap.draw_t(dist(s,r))+r.dt for s in sources]).squeeze()
+        #x[i], v[i], dt[i], success, message, res = geolocalize_xtmap_1Dv(r, sources, t_e, pmap, \
+        #                                                                t_e, clock_drift=t_drift)
+        # rerun with adjusted expected errors on propagation time
+        #for j in range(1):
+        #    x[i], dt[i], success, message, res = geolocalize_xtmap_1D(r, sources, pmap, \
+        #                                                                 clock_drift=t_drift, \
+        #                                                                 x0=[x[i], dt[i]])
+       
+        if success :
+            su[i] = 1 
+        elif message.find('iterations')!= -1 : 
+            su[i] = 0
+
+            
+    # rms error on the receiver position
+    d_rms = np.sqrt( np.mean( (x[np.where(su==1)] - r.x)**2 ) )
+    # biais on the receiver position
+    bias_x = x[np.where(su==1)].mean()-r.x
+    return (d_rms, bias_x, su)
+
+
+
+from ipywidgets import FloatProgress
+from IPython.display import display
+
+
+def transect (sources, X, Y, Nmc, t_e, pmap, v_x=0.1, clock_drift = False, e_dt=0.01, x0=None) :
+    RMS_t = np.zeros((len(X)))
+    BiasX_t = np.zeros((len(X)))
+    Success_t = np.zeros((Nmc, len(X)))
+    
+    r = receiver(X[0], Y, e_dt=e_dt)
+    r_dt = r.dt
+    
+    f = FloatProgress(value = 0., min=0., max=100., step=1., orientation='horizontal', description = 'Loading :')
+    display(f)
+    
+    for i in range (len(X)) :
+        
+        f.value = i/len(X)*100.
+
+        # init a receiver
+        r = receiver(X[i], Y, e_dt=e_dt, v_x=v_x)
+        #r.dt = r_dt # unchanged variable during simulations 
+        #
+        d_rms, bias_x, su = simu (r, sources, Nmc, t_e=t_e, t_drift = clock_drift, pmap=pmap, x0=x0)
+
+        RMS_t[i]       = d_rms
+        BiasX_t[i]     = bias_x
+        Success_t[:,i] = su
+
+    f.value = 100.
+    
+    return RMS_t, BiasX_t, Success_t
+
 
