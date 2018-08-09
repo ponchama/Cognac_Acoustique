@@ -377,15 +377,17 @@ def simu (r, sources, Nmc, t_e, t_drift, pmap, x0=None, new_method=False) :
         
         if not new_method : 
             x[i], v[i], dt[i], success, message, res, J[i] = geolocalize_xtmap_1Dv(r, sources, t_e, pmap, \
-                                                                             clock_drift=False, \
+                                                                             clock_drift=t_drift, \
                                                                             x0 = x0)    
         else : 
 
-            x1, v1, dt1, success1, message1, res1, J1 = geolocalize_xtmap_1Dv(r, sources, t_e, pmap, clock_drift=False, \
-                                                                     x0 = np.array([r.x,0.]))
-            x2,v2, dt2, success2, message2, res2, J2 = geolocalize_xtmap_1Dv(r, sources, t_e, pmap, clock_drift=False, \
-                                                            x0 = np.array([(sources[0].x_s - r.x) + sources[0].x_s,0.]))
-            if J1 <= J2 : 
+            x1, v1, dt1, success1, message1, res1, J1 = geolocalize_xtmap_1Dv(r, sources, t_e, pmap, clock_drift=t_drift, \
+                                                        x0 = np.array([sources[0].x_s - (r.t_r_tilda - t_e)[0]*1500.,0.,0.]))
+            x2,v2, dt2, success2, message2, res2, J2 = geolocalize_xtmap_1Dv(r, sources, t_e, pmap, clock_drift=t_drift, \
+                                                        x0 = np.array([sources[0].x_s + (r.t_r_tilda - t_e)[0]*1500.,0.,0.]))
+            if J1 == J2 : 
+                x[i], v[i], dt[i], success, message, res, J[i] = np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN
+            elif J1 < J2 : 
                 x[i], v[i], dt[i], success, message, res, J[i] = x1, v1, dt1, success1, message1, res1, J1
             else : 
                 x[i], v[i], dt[i], success, message, res, J[i] = x2, v2, dt2, success2, message2, res2, J2
