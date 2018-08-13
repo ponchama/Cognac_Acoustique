@@ -241,9 +241,9 @@ def geolocalize_xtmap(r, sources, pmap, x0=None, clock_drift=True,
         J = ( dx0**2 + dy0**2 ) *W[0]
         if clock_drift:
             J += (dt-dt0**2)**2 *W[1]
-            J += np.mean( (_t - pmap.t(_d))**2 *W[2] )
+            J += np.sum( (_t - pmap.t(_d))**2 *W[2] )
         else:
-            J += np.mean( (_t - pmap.t(_d))**2 *W[1] )
+            J += np.sum( (_t - pmap.t(_d))**2 *W[1] )
         return J
         
     # no jacobian, 'nelder-mead' or 'powell'

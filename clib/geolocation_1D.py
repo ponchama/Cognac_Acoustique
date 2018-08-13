@@ -265,9 +265,9 @@ def geolocalize_xtmap_1D(r, sources, pmap, x0=None, clock_drift=True, plot_min=F
         J = ( dx0**2 ) *W[0]
         if clock_drift:
             J += (dt-dt0**2)**2 *W[1]
-            J += np.mean( (_t - pmap.t(_d))**2 *W[2] )
+            J += np.sum( (_t - pmap.t(_d))**2 *W[2] )
         else:
-            J += np.mean( (_t - pmap.t(_d))**2 *W[1] )
+            J += np.sum( (_t - pmap.t(_d))**2 *W[1] )
             #J = ((_t - pmap.t(_d))**2 *W[1])[1]
             pass
         return J
