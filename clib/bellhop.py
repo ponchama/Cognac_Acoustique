@@ -218,8 +218,10 @@ class bellhop(object):
             #
             ax=plt.axes(projection=crs)
             ax.set_extent(grd.hextent, crs)
-            #gl=ax.gridlines(crs=crs,draw_labels=True)
-            #gl.xlabels_top = False
+            # grid
+            gl=ax.gridlines(crs=crs,draw_labels=True)
+            gl.xlabels_top = False
+            #
             ax.coastlines(resolution='50m')
             #
             toplt = ds['temp'].isel(s_rho=-1).values
@@ -973,7 +975,7 @@ class bellhop(object):
         icount = TL[np.where(Pabs > 1e-37)]       # statistics only on pressure P > 1e-37
         tlmed = np.median (icount)                # median value
         tlstd = np.std(icount)                    # standard deviation
-        tlmax = tlmed + 0.85 * tlstd              # max for colorbar
+        tlmax = tlmed + 0.75 * tlstd              # max for colorbar
         tlmax = 10 * np.round (tlmax/10)          # make sure the limits are round numbers
         tlmin = tlmax - 50                        # min for colorbar
 

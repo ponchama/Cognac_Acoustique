@@ -318,7 +318,7 @@ def get_soundc(t, s, z, lon, lat):
     #
     p = gsw.p_from_z(z,latm)
     SA = gsw.SA_from_SP(s, p, lonm, latm) # s + 0.0003
-    CT = gsw.CT_from_pt(SA,t)   #t+0.002)
+    CT = gsw.CT_from_pt(SA,t)   # t + 0.002
     c = gsw.sound_speed(SA,CT,p)
     #c = gsw.sound_speed(s,t,p)   version used up to 16/07/2018 
     # inputs are: SA (absolute salinity) and CT (conservative temperature)
