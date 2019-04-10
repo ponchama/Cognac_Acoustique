@@ -1,5 +1,6 @@
 # To build the fast modules, run
 #  python setup.py build_ext --inplace
+#  pip install -e .
 
 from distutils.core import setup, Extension
 import numpy
