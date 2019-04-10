@@ -49,6 +49,7 @@ class grid(object):
         #
         if self._verbose > 1:
             print('Lxi = %f km, Leta = %f km' %(self.Lxi/1e3, self.Leta/1e3) )
+        return ' '
         
     def __getitem__(self,item):
         """Returns a grid object restricted to a subdomain.
@@ -178,7 +179,7 @@ class grid(object):
         #self.z_r = z_r()
         self._ds = xr.merge([self._ds, ds['Cs_w'], ds['Cs_r']])
 
-    def get_z(self, zeta, h, sc=None, cs=None):
+    def get_z(self, zeta, h, sc=None, cs=None, name='z'):
         ''' compute vertical coordinates
             zeta should have the size of the final output
             vertical coordinate should be first
@@ -194,7 +195,7 @@ class grid(object):
             z = z.transpose(sc.name, zeta.dims[0], zeta.dims[1])
         elif z.ndim == 2:
             z = z.transpose(sc.name, zeta.dims[0])            
-        return z
+        return z.rename(name)
 
     def plot_domain(self,ax,**kwargs):
         ''' plot the domain bounding box
@@ -245,7 +246,14 @@ def interp2z(z0, z, v, extrap=False):
     vi = fi.interp(z0.astype('float64'), lz.astype('float64'), lv.astype('float64'))
     return vi
 
+def rho2u(v):
+    vout = v.rename({'xi_rho': 'xi_u'})
+    return ((vout.shift(xi_u=1)+vout)*.5).isel(xi_u=slice(1,None))
 
+def rho2v(v):
+    vout = v.rename({'eta_rho': 'eta_v'})
+    return ((vout.shift(eta_v=1)+vout)*.5).isel(eta_v=slice(1,None))
+    
 
 #--------------------------------------------------------------------------------------------
 

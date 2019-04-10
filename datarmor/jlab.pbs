@@ -1,4 +1,5 @@
 #!/bin/csh
+#PBS -q sequentiel
 #PBS -l mem=40g
 #PBS -l walltime=24:00:00
 
